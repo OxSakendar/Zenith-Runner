@@ -185,7 +185,15 @@ export default function App() {
       }
     } catch (error: any) {
       console.error('Wallet connection failed:', error);
-      setToast({ type: 'error', message: error.message || `Failed to connect ${walletName}.` });
+      // Clear any existing toast first, then show error
+      setToast(null);
+      setTimeout(() => {
+        if (error.code === 4001 || error.message?.includes('rejected') || error.message?.includes('denied') || error.message?.includes('cancelled')) {
+          setToast({ type: 'error', message: `Connection rejected. You declined the ${walletName} request.` });
+        } else {
+          setToast({ type: 'error', message: error.message || `Failed to connect ${walletName}.` });
+        }
+      }, 50);
     } finally {
       setIsConnecting(false);
     }
@@ -193,8 +201,11 @@ export default function App() {
 
   const handleSelectWallet = (walletName: string) => {
     setShowWalletModal(false);
-    setToast({ type: 'info', message: `Initializing connection to ${walletName}...` });
-    connectWallet(walletName);
+    setToast(null); // clear previous toast
+    setTimeout(() => {
+      setToast({ type: 'info', message: `Initializing connection to ${walletName}...` });
+      connectWallet(walletName);
+    }, 50);
   };
 
   // Disconnect Wallet
