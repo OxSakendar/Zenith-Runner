@@ -47,7 +47,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'GAME' | 'CHECKIN' | 'LEADERBOARD' | 'RULES'>('GAME');
   const [txLoading, setTxLoading] = useState<{ active: boolean; title: string; message: string; step: number } | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-  const [liveToast, setLiveToast] = useState<string | null>(null); // Live Testnet Activity
 
   // Game State
   const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'GAMEOVER'>('IDLE');
@@ -77,13 +76,6 @@ export default function App() {
     }
   }, [toast]);
 
-  // Auto-dismiss live activity toast after 10 minutes
-  useEffect(() => {
-    if (liveToast) {
-      const timer = setTimeout(() => setLiveToast(null), 600000);
-      return () => clearTimeout(timer);
-    }
-  }, [liveToast]);
 
   // Load account data from localStorage
   const loadAccountData = useCallback((userAddress: string) => {
@@ -334,8 +326,6 @@ export default function App() {
           return updated;
         });
 
-        // Show live activity as its own separate toast (always updates)
-        setLiveToast(`⚡ Live Testnet Activity: Pilot ${randomAddr} verified a score of ${randomScore}!`);
       }
     }, 4000);
 
