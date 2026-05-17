@@ -326,9 +326,13 @@ export default function App() {
           return updated;
         });
 
-        setToast({ 
-          type: 'info', 
-          message: `⚡ Live Testnet Activity: Pilot ${randomAddr} verified a score of ${randomScore}!` 
+        // Only show toast if no toast is currently visible (prevent overwriting user toasts)
+        setToast(prev => {
+          if (prev !== null) return prev; // keep existing toast
+          return { 
+            type: 'info', 
+            message: `⚡ Live Testnet Activity: Pilot ${randomAddr} verified a score of ${randomScore}!` 
+          };
         });
       }
     }, 4000);
