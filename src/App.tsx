@@ -1398,7 +1398,6 @@ export default function App() {
         }}>
           {/* Legal & Policies */}
           <button 
-            onClick={() => setToast({ type: 'info', message: 'Terms of Service: All gameplay operates on the decentralized GenLayer Testnet.' })}
             onClick={() => setActivePolicyModal('TOS')}
             style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
             onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-cyan)'}
