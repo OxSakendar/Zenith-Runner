@@ -3,7 +3,8 @@ import { ethers } from 'ethers';
 import { 
   Wallet, Play, AlertTriangle, Trophy, RefreshCw, Zap, 
   Flame, Coins, Award, Radio, ShieldAlert, CheckCircle2,
-  Calendar, HelpCircle, ExternalLink, ArrowLeft, ArrowRight
+  Calendar, HelpCircle, ExternalLink, ArrowLeft, ArrowRight,
+  X, Send
 } from 'lucide-react';
 
 // Declare window.ethereum for TypeScript
@@ -35,6 +36,11 @@ export default function App() {
   const [chainId, setChainId] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isWrongNetwork, setIsWrongNetwork] = useState<boolean>(false);
+
+  // Contact & Policy Modal State
+  const [showContactModal, setShowContactModal] = useState<boolean>(false);
+  const [contactForm, setContactForm] = useState({ name: '', email: '', category: 'General Inquiry', message: '' });
+  const [activePolicyModal, setActivePolicyModal] = useState<'TOS' | 'PRIVACY' | 'COOKIE' | null>(null);
 
   // App & Transaction State
   const [activeTab, setActiveTab] = useState<'GAME' | 'CHECKIN' | 'LEADERBOARD' | 'RULES'>('GAME');
@@ -1209,6 +1215,186 @@ export default function App() {
         )}
       </main>
 
+      {/* FOOTER MENU */}
+      <footer style={{
+        marginTop: 'auto',
+        borderTop: '1px solid var(--border-color)',
+        background: 'rgba(10, 6, 18, 0.85)',
+        backdropFilter: 'blur(16px)',
+        padding: '2rem 1.5rem',
+        color: 'var(--text-muted)'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '2.5rem',
+          fontSize: '0.95rem'
+        }}>
+          {/* Legal & Policies */}
+          <button 
+            onClick={() => setToast({ type: 'info', message: 'Terms of Service: All gameplay operates on the decentralized GenLayer Testnet.' })}
+            onClick={() => setActivePolicyModal('TOS')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-cyan)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
+            Terms of Service
+          </button>
+          <button 
+            onClick={() => setActivePolicyModal('PRIVACY')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-cyan)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
+            Privacy Policy
+          </button>
+          <button 
+            onClick={() => setActivePolicyModal('COOKIE')}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-cyan)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
+            Cookie Policy
+          </button>
+          <button 
+            onClick={() => setShowContactModal(true)}
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 0 }}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-cyan)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+          >
+            Contact Us
+          </button>
+        </div>
+      </footer>
+
+      {/* POLICY POPUP MODALS */}
+      {activePolicyModal && (
+        <div className="modal-backdrop" style={{ zIndex: 1200 }}>
+          <div className="modal-content glass-card" style={{ 
+            padding: '2.5rem', 
+            background: 'rgba(15, 8, 30, 0.95)', 
+            border: '1px solid var(--accent-purple)', 
+            boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px var(--accent-purple-glow)',
+            maxWidth: '600px',
+            width: '100%',
+            position: 'relative',
+            maxHeight: '85vh',
+            overflowY: 'auto',
+            textAlign: 'left'
+          }}>
+            <button 
+              onClick={() => setActivePolicyModal(null)}
+              style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+            >
+              <X size={20} />
+            </button>
+
+            {activePolicyModal === 'TOS' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'var(--accent-purple-glow)', border: '2px solid var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ShieldAlert size={24} color="white" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.6rem', fontWeight: 700, margin: 0 }}>Terms of Service</h3>
+                    <span style={{ color: 'var(--accent-cyan)', fontSize: '0.85rem' }}>GenLayer Testnet Agreement</span>
+                  </div>
+                </div>
+
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>1. Acceptance of Terms:</strong> By connecting your Web3 wallet and engaging with the Zenith Runner cyber arena, you agree to operate within the decentralized parameters established on the GenLayer Testnet.
+                  </p>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>2. Testnet Execution & Fees:</strong> All in-game transactions, including game initialization (0.01 GEN), score submissions (0.01 GEN), and daily check-ins (0.01 GEN), utilize testnet utility tokens. These tokens hold no real-world monetary value and are designated strictly for ecosystem simulation.
+                  </p>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>3. Decentralized Verification:</strong> Leaderboard rankings and bonus point allocations are validated via intelligent contracts on the GenLayer blockchain. Zenith Runner does not guarantee uninterrupted network uptime during testnet phases.
+                  </p>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>4. Code of Conduct:</strong> Automated botting, packet manipulation, or attempting to exploit the testnet faucet mechanisms will result in immediate disqualification from the GenLayer Odyssey leaderboard hall of fame.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {activePolicyModal === 'PRIVACY' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'var(--accent-cyan-glow)', border: '2px solid var(--accent-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <HelpCircle size={24} color="white" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.6rem', fontWeight: 700, margin: 0 }}>Privacy Policy</h3>
+                    <span style={{ color: 'var(--accent-cyan)', fontSize: '0.85rem' }}>Non-Custodial Web3 Architecture</span>
+                  </div>
+                </div>
+
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>1. Zero Personal Data Storage:</strong> Zenith Runner operates on a strictly non-custodial Web3 framework. We do not collect, store, or process personal identifiable information such as legal names, physical addresses, or phone numbers.
+                  </p>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>2. Wallet Authentication:</strong> Authentication is handled exclusively through your cryptographic wallet address (e.g., MetaMask). Your public address is utilized solely for tracking leaderboard scores, daily streak check-ins, and token balances.
+                  </p>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>3. On-Chain Transparency:</strong> Because Zenith Runner interacts with the GenLayer Testnet, all score submissions and micro-transactions are permanently recorded on a public, immutable ledger accessible via the GenLayer Block Explorer.
+                  </p>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>4. Third-Party Integrations:</strong> We do not sell or share any analytical data with external third parties. All network telemetry is confined to the GenLayer Foundation testnet infrastructure.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {activePolicyModal === 'COOKIE' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'var(--accent-purple-glow)', border: '2px solid var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CheckCircle2 size={24} color="white" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.6rem', fontWeight: 700, margin: 0 }}>Cookie & Storage Policy</h3>
+                    <span style={{ color: 'var(--accent-cyan)', fontSize: '0.85rem' }}>Client-Side State Management</span>
+                  </div>
+                </div>
+
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.7, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>1. Local Storage Utilization:</strong> Zenith Runner uses standard HTML5 Local Storage rather than traditional tracking cookies. This ensures lightning-fast performance and seamless offline/online state transitions.
+                  </p>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>2. What We Store Locally:</strong> We store minimal data packets locally on your device, including:
+                  </p>
+                  <ul style={{ paddingLeft: '1.5rem', margin: 0, color: 'var(--text-main)' }}>
+                    <li>Your personal high score and accumulated bonus points.</li>
+                    <li>Daily check-in timestamps to maintain your active streak.</li>
+                    <li>Cached leaderboard snapshots to reduce redundant RPC network requests.</li>
+                  </ul>
+                  <p>
+                    <strong style={{ color: 'var(--text-main)' }}>3. Clearing Your Cache:</strong> You retain complete control over your local data. You can clear your browser's local storage cache at any time without impacting your verified on-chain score history on the GenLayer Testnet.
+                  </p>
+                </div>
+              </>
+            )}
+
+            <button 
+              onClick={() => setActivePolicyModal(null)} 
+              className="btn-premium btn-purple" 
+              style={{ width: '100%', padding: '0.8rem', marginTop: '1.5rem', fontSize: '1rem' }}
+            >
+              Acknowledge & Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* TRANSACTION LOADING MODAL */}
       {txLoading && (
         <div className="modal-backdrop">
@@ -1236,6 +1422,107 @@ export default function App() {
               <span>Wallet Approval</span>
               <span>GenLayer Confirmation</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONTACT US POPUP FORM MODAL */}
+      {showContactModal && (
+        <div className="modal-backdrop" style={{ zIndex: 1200 }}>
+          <div className="modal-content glass-card" style={{ 
+            padding: '2rem', 
+            background: 'rgba(15, 8, 30, 0.95)', 
+            border: '1px solid var(--accent-cyan)', 
+            boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px var(--accent-cyan-glow)',
+            maxWidth: '440px',
+            width: '100%',
+            position: 'relative'
+          }}>
+            <button 
+              onClick={() => setShowContactModal(false)}
+              style={{ position: 'absolute', top: '1.2rem', right: '1.2rem', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+            >
+              <X size={18} />
+            </button>
+
+            <div style={{ width: '52px', height: '52px', borderRadius: '16px', background: 'var(--accent-cyan-glow)', border: '2px solid var(--accent-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.2rem' }}>
+              <Send size={24} color="white" />
+            </div>
+
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.4rem', textAlign: 'center' }}>Contact Command</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+              Transmit a message directly to Zenith Runner core dev.
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setShowContactModal(false);
+              setToast({ type: 'success', message: `Transmission sent! We have received your ${contactForm.category} inquiry.` });
+              setContactForm({ name: '', email: '', category: 'General Inquiry', message: '' });
+            }} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem', fontWeight: 600 }}>Player Address</label>
+                <input 
+                  type="text" 
+                  required
+                  value={contactForm.name}
+                  onChange={(e) => setContactForm({...contactForm, name: e.target.value})}
+                  placeholder="e.g. 0x71C...3a99"
+                  style={{ width: '100%', padding: '0.7rem 1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.9rem', outline: 'none' }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem', fontWeight: 600 }}>Email</label>
+                <input 
+                  type="email" 
+                  required
+                  value={contactForm.email}
+                  onChange={(e) => setContactForm({...contactForm, email: e.target.value})}
+                  placeholder="e.g. pilot@genlayer.com"
+                  style={{ width: '100%', padding: '0.7rem 1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.9rem', outline: 'none' }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem', fontWeight: 600 }}>Transmission Category</label>
+                <select 
+                  value={contactForm.category}
+                  onChange={(e) => setContactForm({...contactForm, category: e.target.value})}
+                  style={{ width: '100%', padding: '0.7rem 1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.8)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.9rem', outline: 'none', cursor: 'pointer' }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                >
+                  <option value="General Inquiry">General Inquiry</option>
+                  <option value="Bug Report">Bug / Issue Report</option>
+                  <option value="Feature Request">Feature Request</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.3rem', fontWeight: 600 }}>Message</label>
+                <textarea 
+                  required
+                  rows={3}
+                  value={contactForm.message}
+                  onChange={(e) => setContactForm({...contactForm, message: e.target.value})}
+                  placeholder="Enter your transmission coordinates and message..."
+                  style={{ width: '100%', padding: '0.7rem 1rem', borderRadius: '12px', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                />
+              </div>
+
+              <button type="submit" className="btn-premium btn-cyan" style={{ width: '100%', padding: '0.8rem 1rem', fontSize: '1rem', marginTop: '0.4rem' }}>
+                <Send size={18} /> Send Transmission (Free)
+              </button>
+            </form>
           </div>
         </div>
       )}
