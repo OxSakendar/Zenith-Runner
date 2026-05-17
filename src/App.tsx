@@ -77,10 +77,10 @@ export default function App() {
     }
   }, [toast]);
 
-  // Auto-dismiss live activity toast after 6 seconds
+  // Auto-dismiss live activity toast after 10 minutes
   useEffect(() => {
     if (liveToast) {
-      const timer = setTimeout(() => setLiveToast(null), 6000);
+      const timer = setTimeout(() => setLiveToast(null), 600000);
       return () => clearTimeout(timer);
     }
   }, [liveToast]);
