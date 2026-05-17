@@ -958,14 +958,24 @@ export default function App() {
         {toast && (
           <div style={{
             position: 'fixed', top: '80px', right: '24px', zIndex: 1100,
-            background: toast.type === 'success' ? 'rgba(16, 185, 129, 0.9)' : toast.type === 'error' ? 'rgba(239, 68, 68, 0.9)' : 'rgba(6, 182, 212, 0.9)',
+            background: toast.type === 'success' ? 'rgba(16, 185, 129, 0.95)' : toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(6, 182, 212, 0.95)',
             color: 'white', padding: '1rem 1.5rem', borderRadius: '16px',
             boxShadow: '0 10px 30px rgba(0,0,0,0.5)', backdropFilter: 'blur(12px)',
-            display: 'flex', alignItems: 'center', gap: '0.8rem',
+            display: 'flex', alignItems: 'center', gap: '1rem',
             animation: 'fadeIn 0.3s ease-out'
           }}>
-            {toast.type === 'success' ? <CheckCircle2 size={22} /> : toast.type === 'error' ? <ShieldAlert size={22} /> : <Zap size={22} />}
-            <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{toast.message}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+              {toast.type === 'success' ? <CheckCircle2 size={22} /> : toast.type === 'error' ? <ShieldAlert size={22} /> : <Zap size={22} />}
+              <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{toast.message}</span>
+            </div>
+            <button 
+              onClick={() => setToast(null)}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '0.5rem' }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
+            >
+              <X size={16} />
+            </button>
           </div>
         )}
 
