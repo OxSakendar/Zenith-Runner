@@ -71,7 +71,8 @@ export default function App() {
   // Auto-dismiss toast
   useEffect(() => {
     if (toast) {
-      const timer = setTimeout(() => setToast(null), 5000);
+      // 10 minutes = 600000ms
+      const timer = setTimeout(() => setToast(null), 600000);
       return () => clearTimeout(timer);
     }
   }, [toast]);
