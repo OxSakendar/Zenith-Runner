@@ -962,24 +962,27 @@ export default function App() {
         {/* Toast Notification */}
         {toast && (
           <div style={{
-            position: 'fixed', top: '80px', right: '24px', zIndex: 1100,
+            position: 'fixed', top: '80px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 1100, width: 'calc(100% - 2rem)', maxWidth: '480px',
             background: toast.type === 'success' ? 'rgba(16, 185, 129, 0.95)' : toast.type === 'error' ? 'rgba(239, 68, 68, 0.95)' : 'rgba(6, 182, 212, 0.95)',
-            color: 'white', padding: '1rem 1.5rem', borderRadius: '16px',
+            color: 'white', padding: '0.9rem 1.2rem', borderRadius: '14px',
             boxShadow: '0 10px 30px rgba(0,0,0,0.5)', backdropFilter: 'blur(12px)',
-            display: 'flex', alignItems: 'center', gap: '1rem',
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.8rem',
             animation: 'fadeIn 0.3s ease-out'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-              {toast.type === 'success' ? <CheckCircle2 size={22} /> : toast.type === 'error' ? <ShieldAlert size={22} /> : <Zap size={22} />}
-              <span style={{ fontWeight: 500, fontSize: '0.95rem' }}>{toast.message}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.8rem', flex: 1 }}>
+              <div style={{ flexShrink: 0, paddingTop: '2px' }}>
+                {toast.type === 'success' ? <CheckCircle2 size={20} /> : toast.type === 'error' ? <ShieldAlert size={20} /> : <Zap size={20} />}
+              </div>
+              <span style={{ fontWeight: 500, fontSize: '0.9rem', lineHeight: 1.4 }}>{toast.message}</span>
             </div>
             <button 
               onClick={() => setToast(null)}
-              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', padding: '0.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '0.5rem' }}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           </div>
         )}
@@ -1010,34 +1013,38 @@ export default function App() {
         )}
 
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem', marginBottom: '2rem' }}>
           <button 
             onClick={() => setActiveTab('GAME')}
             className={`btn-premium ${activeTab === 'GAME' ? 'btn-purple' : 'btn-outline'}`}
-            style={{ borderRadius: '16px', padding: '0.7rem 1.5rem' }}
+            style={{ borderRadius: '14px', padding: '0.7rem 0.5rem', fontSize: '0.85rem', flexDirection: 'column', gap: '0.3rem', textAlign: 'center' }}
           >
-            <Play size={18} /> Game Arena
+            <Play size={16} />
+            <span>Game Arena</span>
           </button>
           <button 
             onClick={() => setActiveTab('CHECKIN')}
             className={`btn-premium ${activeTab === 'CHECKIN' ? 'btn-cyan' : 'btn-outline'}`}
-            style={{ borderRadius: '16px', padding: '0.7rem 1.5rem' }}
+            style={{ borderRadius: '14px', padding: '0.7rem 0.5rem', fontSize: '0.85rem', flexDirection: 'column', gap: '0.3rem', textAlign: 'center' }}
           >
-            <Calendar size={18} /> Daily Check-In
+            <Calendar size={16} />
+            <span>Daily Check-In</span>
           </button>
           <button 
             onClick={() => setActiveTab('LEADERBOARD')}
             className={`btn-premium ${activeTab === 'LEADERBOARD' ? 'btn-purple' : 'btn-outline'}`}
-            style={{ borderRadius: '16px', padding: '0.7rem 1.5rem' }}
+            style={{ borderRadius: '14px', padding: '0.7rem 0.5rem', fontSize: '0.85rem', flexDirection: 'column', gap: '0.3rem', textAlign: 'center' }}
           >
-            <Trophy size={18} /> Leaderboard
+            <Trophy size={16} />
+            <span>Leaderboard</span>
           </button>
           <button 
             onClick={() => setActiveTab('RULES')}
             className={`btn-premium ${activeTab === 'RULES' ? 'btn-cyan' : 'btn-outline'}`}
-            style={{ borderRadius: '16px', padding: '0.7rem 1.5rem' }}
+            style={{ borderRadius: '14px', padding: '0.7rem 0.5rem', fontSize: '0.85rem', flexDirection: 'column', gap: '0.3rem', textAlign: 'center' }}
           >
-            <HelpCircle size={18} /> Rules & Info
+            <HelpCircle size={16} />
+            <span>Rules & Info</span>
           </button>
         </div>
 
