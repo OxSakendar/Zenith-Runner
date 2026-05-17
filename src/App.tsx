@@ -1704,107 +1704,98 @@ export default function App() {
         </div>
       )}
 
-      {/* WALLET SELECTION POPUP MODAL */}
       {showWalletModal && (
         <div className="modal-backdrop" style={{ zIndex: 1200 }}>
-          <div className="modal-content glass-card" style={{ 
-            padding: '2rem', 
-            background: 'rgba(15, 8, 30, 0.95)', 
-            border: '1px solid var(--accent-cyan)', 
-            boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px var(--accent-cyan-glow)',
-            maxWidth: '400px',
-            width: '100%',
+          <div style={{ 
+            display: 'flex',
+            background: 'rgba(13, 8, 25, 0.98)', 
+            border: '1px solid rgba(255,255,255,0.1)', 
+            boxShadow: '0 25px 60px rgba(0,0,0,0.9)',
+            borderRadius: '20px',
+            maxWidth: '720px',
+            width: 'calc(100% - 2rem)',
+            overflow: 'hidden',
             position: 'relative',
-            textAlign: 'center'
+            animation: 'scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
+            {/* Close Button */}
             <button 
               onClick={() => setShowWalletModal(false)}
-              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}
-              onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+              style={{ position: 'absolute', top: '1rem', right: '1rem', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer', zIndex: 10 }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
             >
-              <X size={18} />
+              <X size={16} />
             </button>
 
-            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'var(--accent-purple-glow)', border: '2px solid var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.2rem' }}>
-              <Wallet size={28} color="white" />
+            {/* Left Panel - Wallet List */}
+            <div style={{ width: '260px', minWidth: '260px', borderRight: '1px solid rgba(255,255,255,0.08)', padding: '1.5rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.3rem', overflowY: 'auto', maxHeight: '520px' }}>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 1rem 0.5rem' }}>Connect a Wallet</h3>
+
+              {/* Installed Section */}
+              <p style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontWeight: 600, margin: '0 0 0.4rem 0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Installed</p>
+              {[
+                { name: 'Bitget Wallet', color: 'linear-gradient(135deg, #00f0ff, #0072ff)', icon: '⚡' },
+                { name: 'Phantom', color: 'linear-gradient(135deg, #9945ff, #6b21a8)', icon: '👻' },
+                { name: 'Backpack', color: 'linear-gradient(135deg, #e33e3f, #b91c1c)', icon: '🎒' },
+              ].map(w => (
+                <button key={w.name} onClick={() => handleSelectWallet(w.name)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.7rem 0.8rem', borderRadius: '12px', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', transition: 'background 0.15s', width: '100%', textAlign: 'left' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: w.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>{w.icon}</div>
+                  <span>{w.name}</span>
+                </button>
+              ))}
+
+              {/* Popular Section */}
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, margin: '0.8rem 0 0.4rem 0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Popular</p>
+              {[
+                { name: 'Rainbow', color: 'linear-gradient(135deg, #ff0080, #7928ca)', icon: '🌈' },
+                { name: 'Base', color: '#0052ff', icon: '🔵' },
+                { name: 'MetaMask', color: '#f6851b', icon: '🦊' },
+                { name: 'WalletConnect', color: '#3b99fc', icon: '🔗' },
+              ].map(w => (
+                <button key={w.name} onClick={() => handleSelectWallet(w.name)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.7rem 0.8rem', borderRadius: '12px', background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem', transition: 'background 0.15s', width: '100%', textAlign: 'left' }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: typeof w.color === 'string' && w.color.startsWith('linear') ? w.color : w.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>{w.icon}</div>
+                  <span>{w.name}</span>
+                </button>
+              ))}
             </div>
 
-            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Connect Web3 Wallet</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Select your preferred Web3 wallet provider to authenticate on the GenLayer Testnet.
-            </p>
+            {/* Right Panel - What is a Wallet */}
+            <div style={{ flex: 1, padding: '2.5rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 700, margin: 0 }}>What is a Wallet?</h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              <button 
-                onClick={() => handleSelectWallet('Bitget Wallet')}
-                className="glass-card"
-                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-cyan)'; e.currentTarget.style.background = 'rgba(6, 182, 212, 0.1)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, #00f0ff 0%, #0072ff 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>B</div>
-                  <span>Bitget Wallet</span>
+              <div style={{ display: 'flex', gap: '1.2rem', alignItems: 'flex-start', textAlign: 'left' }}>
+                <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg, var(--accent-purple), var(--accent-cyan))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>🏦</div>
+                <div>
+                  <p style={{ fontWeight: 700, margin: '0 0 0.3rem 0', fontSize: '0.95rem' }}>A Home for your Digital Assets</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>Wallets are used to send, receive, store, and display digital assets like Ethereum and NFTs.</p>
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', background: 'rgba(6,182,212,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>Popular</span>
-              </button>
+              </div>
 
-              <button 
-                onClick={() => handleSelectWallet('Rainbow')}
-                className="glass-card"
-                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#ec4899'; e.currentTarget.style.background = 'rgba(236, 72, 153, 0.1)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, #ff007a 0%, #7928ca 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>R</div>
-                  <span>Rainbow</span>
+              <div style={{ display: 'flex', gap: '1.2rem', alignItems: 'flex-start', textAlign: 'left' }}>
+                <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg, #7928ca, #ff0080)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>🔑</div>
+                <div>
+                  <p style={{ fontWeight: 700, margin: '0 0 0.3rem 0', fontSize: '0.95rem' }}>A New Way to Log In</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>Instead of creating new accounts and passwords on every website, just connect your wallet.</p>
                 </div>
-                <span style={{ fontSize: '0.75rem', color: '#f43f5e', background: 'rgba(244,63,94,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>Mobile / Web</span>
-              </button>
+              </div>
 
               <button 
-                onClick={() => handleSelectWallet('Base')}
-                className="glass-card"
-                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
+                onClick={() => window.open('https://ethereum.org/en/wallets/', '_blank')}
+                className="btn-premium btn-purple"
+                style={{ padding: '0.7rem 2rem', fontSize: '0.95rem', borderRadius: '12px', marginTop: '0.5rem' }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#0052ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>cb</div>
-                  <span>Base (Coinbase Wallet)</span>
-                </div>
-                <span style={{ fontSize: '0.75rem', color: '#60a5fa', background: 'rgba(59,130,246,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>Smart Wallet</span>
+                Get a Wallet
               </button>
-
-              <button 
-                onClick={() => handleSelectWallet('MetaMask')}
-                className="glass-card"
-                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f59e0b'; e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#f6851b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>M</div>
-                  <span>MetaMask</span>
-                </div>
-                <span style={{ fontSize: '0.75rem', color: '#fbbf24', background: 'rgba(245,158,11,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>Injected</span>
-              </button>
-
-              <button 
-                onClick={() => handleSelectWallet('WalletConnect')}
-                className="glass-card"
-                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-purple)'; e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#3b99fc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>W</div>
-                  <span>WalletConnect</span>
-                </div>
-                <span style={{ fontSize: '0.75rem', color: '#d8b4fe', background: 'rgba(168,85,247,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>QR Code</span>
-              </button>
+              <a href="https://ethereum.org/en/wallets/find-wallet/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-cyan)', fontSize: '0.9rem', fontWeight: 600 }}>Learn More</a>
             </div>
           </div>
         </div>
