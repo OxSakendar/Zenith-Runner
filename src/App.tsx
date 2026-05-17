@@ -47,6 +47,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'GAME' | 'CHECKIN' | 'LEADERBOARD' | 'RULES'>('GAME');
   const [txLoading, setTxLoading] = useState<{ active: boolean; title: string; message: string; step: number } | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [liveToast, setLiveToast] = useState<string | null>(null); // Live Testnet Activity
 
   // Game State
   const [gameState, setGameState] = useState<'IDLE' | 'PLAYING' | 'GAMEOVER'>('IDLE');
@@ -68,14 +69,21 @@ export default function App() {
   const particlesRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; color: string; alpha: number; size: number }>>([]);
   const keysRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
 
-  // Auto-dismiss toast
+  // Auto-dismiss user toast after 10 minutes
   useEffect(() => {
     if (toast) {
-      // 10 minutes = 600000ms
       const timer = setTimeout(() => setToast(null), 600000);
       return () => clearTimeout(timer);
     }
   }, [toast]);
+
+  // Auto-dismiss live activity toast after 6 seconds
+  useEffect(() => {
+    if (liveToast) {
+      const timer = setTimeout(() => setLiveToast(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [liveToast]);
 
   // Load account data from localStorage
   const loadAccountData = useCallback((userAddress: string) => {
@@ -326,14 +334,8 @@ export default function App() {
           return updated;
         });
 
-        // Only show toast if no toast is currently visible (prevent overwriting user toasts)
-        setToast(prev => {
-          if (prev !== null) return prev; // keep existing toast
-          return { 
-            type: 'info', 
-            message: `⚡ Live Testnet Activity: Pilot ${randomAddr} verified a score of ${randomScore}!` 
-          };
-        });
+        // Show live activity as its own separate toast (always updates)
+        setLiveToast(`⚡ Live Testnet Activity: Pilot ${randomAddr} verified a score of ${randomScore}!`);
       }
     }, 4000);
 
@@ -983,6 +985,32 @@ export default function App() {
               onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
             >
               <X size={18} />
+            </button>
+          </div>
+        )}
+
+        {/* Live Testnet Activity Toast - separate from user toasts */}
+        {liveToast && (
+          <div style={{
+            position: 'fixed', top: toast ? '145px' : '80px', left: '50%', transform: 'translateX(-50%)',
+            zIndex: 1099, width: 'calc(100% - 2rem)', maxWidth: '480px',
+            background: 'rgba(6, 182, 212, 0.92)',
+            color: 'white', padding: '0.75rem 1rem', borderRadius: '14px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)', backdropFilter: 'blur(12px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem',
+            animation: 'fadeIn 0.3s ease-out', fontSize: '0.88rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flex: 1 }}>
+              <Zap size={16} style={{ flexShrink: 0 }} />
+              <span style={{ fontWeight: 500, lineHeight: 1.4 }}>{liveToast}</span>
+            </div>
+            <button
+              onClick={() => setLiveToast(null)}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+              onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.8)'}
+            >
+              <X size={16} />
             </button>
           </div>
         )}
