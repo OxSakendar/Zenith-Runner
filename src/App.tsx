@@ -1692,102 +1692,102 @@ export default function App() {
       {showWalletModal && (
         <div className="modal-backdrop" style={{ zIndex: 1200 }}>
           <div className="modal-content glass-card" style={{ 
-            padding: '2.5rem', 
+            padding: '2rem', 
             background: 'rgba(15, 8, 30, 0.95)', 
             border: '1px solid var(--accent-cyan)', 
             boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px var(--accent-cyan-glow)',
-            maxWidth: '460px',
+            maxWidth: '400px',
             width: '100%',
             position: 'relative',
             textAlign: 'center'
           }}>
             <button 
               onClick={() => setShowWalletModal(false)}
-              style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer' }}
               onMouseEnter={(e) => e.currentTarget.style.color = 'white'}
               onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
             >
-              <X size={20} />
+              <X size={18} />
             </button>
 
-            <div style={{ width: '64px', height: '64px', borderRadius: '20px', background: 'var(--accent-purple-glow)', border: '2px solid var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
-              <Wallet size={32} color="white" />
+            <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'var(--accent-purple-glow)', border: '2px solid var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.2rem' }}>
+              <Wallet size={28} color="white" />
             </div>
 
-            <h3 style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.5rem' }}>Connect Web3 Wallet</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '2rem' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>Connect Web3 Wallet</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
               Select your preferred Web3 wallet provider to authenticate on the GenLayer Testnet.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
               <button 
                 onClick={() => handleSelectWallet('Bitget Wallet')}
                 className="glass-card"
-                style={{ padding: '1.2rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1.05rem' }}
+                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-cyan)'; e.currentTarget.style.background = 'rgba(6, 182, 212, 0.1)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #00f0ff 0%, #0072ff 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem', color: 'white' }}>B</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, #00f0ff 0%, #0072ff 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>B</div>
                   <span>Bitget Wallet</span>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)', background: 'rgba(6,182,212,0.15)', padding: '0.2rem 0.6rem', borderRadius: '8px' }}>Popular</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', background: 'rgba(6,182,212,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>Popular</span>
               </button>
 
               <button 
                 onClick={() => handleSelectWallet('Rainbow')}
                 className="glass-card"
-                style={{ padding: '1.2rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1.05rem' }}
+                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#ec4899'; e.currentTarget.style.background = 'rgba(236, 72, 153, 0.1)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, #ff007a 0%, #7928ca 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem', color: 'white' }}>R</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: 'linear-gradient(135deg, #ff007a 0%, #7928ca 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>R</div>
                   <span>Rainbow</span>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: '#f43f5e', background: 'rgba(244,63,94,0.15)', padding: '0.2rem 0.6rem', borderRadius: '8px' }}>Mobile / Web</span>
+                <span style={{ fontSize: '0.75rem', color: '#f43f5e', background: 'rgba(244,63,94,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>Mobile / Web</span>
               </button>
 
               <button 
                 onClick={() => handleSelectWallet('Base')}
                 className="glass-card"
-                style={{ padding: '1.2rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1.05rem' }}
+                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#0052ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem', color: 'white' }}>cb</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#0052ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>cb</div>
                   <span>Base (Coinbase Wallet)</span>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: '#60a5fa', background: 'rgba(59,130,246,0.15)', padding: '0.2rem 0.6rem', borderRadius: '8px' }}>Smart Wallet</span>
+                <span style={{ fontSize: '0.75rem', color: '#60a5fa', background: 'rgba(59,130,246,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>Smart Wallet</span>
               </button>
 
               <button 
                 onClick={() => handleSelectWallet('MetaMask')}
                 className="glass-card"
-                style={{ padding: '1.2rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1.05rem' }}
+                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#f59e0b'; e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#f6851b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem', color: 'white' }}>M</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#f6851b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>M</div>
                   <span>MetaMask</span>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: '#fbbf24', background: 'rgba(245,158,11,0.15)', padding: '0.2rem 0.6rem', borderRadius: '8px' }}>Injected</span>
+                <span style={{ fontSize: '0.75rem', color: '#fbbf24', background: 'rgba(245,158,11,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>Injected</span>
               </button>
 
               <button 
                 onClick={() => handleSelectWallet('WalletConnect')}
                 className="glass-card"
-                style={{ padding: '1.2rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1.05rem' }}
+                style={{ padding: '1rem 1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border-color)', borderRadius: '16px', cursor: 'pointer', transition: 'all 0.2s', color: 'white', fontWeight: 600, fontSize: '1rem' }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent-purple)'; e.currentTarget.style.background = 'rgba(168, 85, 247, 0.1)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.background = 'rgba(0,0,0,0.4)'; }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#3b99fc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem', color: 'white' }}>W</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '10px', background: '#3b99fc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem', color: 'white' }}>W</div>
                   <span>WalletConnect</span>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: '#d8b4fe', background: 'rgba(168,85,247,0.15)', padding: '0.2rem 0.6rem', borderRadius: '8px' }}>QR Code</span>
+                <span style={{ fontSize: '0.75rem', color: '#d8b4fe', background: 'rgba(168,85,247,0.15)', padding: '0.2rem 0.5rem', borderRadius: '8px' }}>QR Code</span>
               </button>
             </div>
           </div>
