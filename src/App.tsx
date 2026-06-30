@@ -1083,12 +1083,12 @@ export default function App() {
               {/* OVERLAYS */}
               {gameState === 'IDLE' && (
                 <div className="game-overlay">
-                  <div style={{ maxWidth: '460px', padding: '2.5rem', borderRadius: '24px', background: 'rgba(15, 8, 30, 0.75)', border: '1px solid var(--border-color)', backdropFilter: 'blur(16px)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
-                    <div style={{ width: '72px', height: '72px', borderRadius: '20px', background: 'var(--accent-purple-glow)', border: '2px solid var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                  <div className="overlay-card" style={{ maxWidth: '460px', padding: '2.5rem', borderRadius: '24px', background: 'rgba(15, 8, 30, 0.75)', border: '1px solid var(--border-color)', backdropFilter: 'blur(16px)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+                    <div className="overlay-icon-wrapper" style={{ width: '72px', height: '72px', borderRadius: '20px', background: 'var(--accent-purple-glow)', border: '2px solid var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                       <Zap size={36} color="white" />
                     </div>
-                    <h2 style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '1rem' }}>Ready for Launch?</h2>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '1.8rem', fontSize: '1.05rem', lineHeight: 1.5 }}>
+                    <h2 className="overlay-title" style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '1rem' }}>Ready for Launch?</h2>
+                    <p className="overlay-desc" style={{ color: 'var(--text-muted)', marginBottom: '1.8rem', fontSize: '1.05rem', lineHeight: 1.5 }}>
                       Collect cyan GEN energy crystals to score points. Dodge dark matter asteroids and <span style={{ color: '#f43f5e', fontWeight: 600 }}>avoid red corrupted crystals</span> (touching red is instant Game Over!). Requires <span className="text-glow-cyan font-semibold">0.01 GEN</span> per session.
                     </p>
 
@@ -1111,14 +1111,14 @@ export default function App() {
 
               {gameState === 'GAMEOVER' && (
                 <div className="game-overlay">
-                  <div style={{ maxWidth: '460px', padding: '2.5rem', borderRadius: '24px', background: 'rgba(20, 8, 25, 0.85)', border: '1px solid rgba(239, 68, 68, 0.4)', backdropFilter: 'blur(16px)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
-                    <div style={{ width: '72px', height: '72px', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.2)', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
+                  <div className="overlay-card gameover-card" style={{ maxWidth: '460px', padding: '2.5rem', borderRadius: '24px', background: 'rgba(20, 8, 25, 0.85)', border: '1px solid rgba(239, 68, 68, 0.4)', backdropFilter: 'blur(16px)', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+                    <div className="overlay-icon-wrapper" style={{ width: '72px', height: '72px', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.2)', border: '2px solid #ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem' }}>
                       <Flame size={36} color="#ef4444" />
                     </div>
-                    <h2 style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.5rem', color: '#fca5a5' }}>Game Over!</h2>
-                    <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '1.05rem' }}>Your shields were depleted by dark matter.</p>
+                    <h2 className="overlay-title" style={{ fontSize: '2rem', fontWeight: 700, marginBottom: '0.5rem', color: '#fca5a5' }}>Game Over!</h2>
+                    <p className="overlay-desc" style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '1.05rem' }}>Your shields were depleted by dark matter.</p>
 
-                    <div className="glass-card" style={{ padding: '1.2rem', marginBottom: '1.8rem', background: 'rgba(0,0,0,0.4)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="glass-card overlay-stats-card" style={{ padding: '1.2rem', marginBottom: '1.8rem', background: 'rgba(0,0,0,0.4)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div>
                         <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Base Score</span>
                         <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>{score}</div>
@@ -1133,7 +1133,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div className="overlay-actions" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       <button onClick={handleSubmitScore} className="btn-premium btn-purple" style={{ width: '100%', padding: '1rem', fontSize: '1.05rem' }}>
                         <Trophy size={20} /> Submit Score & Rank Up (0.01 GEN)
                       </button>
