@@ -132,6 +132,15 @@ ZENITH RUNNER/
 
 ---
 
+## 🛠️ Recent Updates (Changelog)
+
+- **Wallet Connection Toast Resolution**: Resolved an issue where the error toast did not refresh correctly when a user rejected the wallet connection request (e.g., MetaMask rejection code `4001`). Implemented a state-clearing and debounce mechanism.
+- **Enhanced Native Wallet Selection Modal**: Upgraded the wallet connection modal to a clean, native-feeling, glassmorphic selector UI.
+- **Rendering & Screen Reliability**: Fixed blank screen errors by refactoring and optimizing JSX toast notifications.
+- **Activity Telemetry Optimization**: Streamlined testnet active player activity tracking to improve local performance.
+
+---
+
 ## 📜 Legal & Policies
 
 Zenith Runner is a non-custodial Web3 application. We do not store, harvest, or request personal user data. All transactions and scores are transparently recorded on the public and immutable GenLayer Testnet. For full details on the Terms of Service, Privacy Policy, or Cookie Policies, click the policy buttons in the application footer.
