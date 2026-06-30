@@ -1018,7 +1018,7 @@ export default function App() {
         )}
 
         {/* Navigation Tabs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.6rem', marginBottom: '2rem' }}>
+        <div className="nav-tabs">
           <button 
             onClick={() => setActiveTab('GAME')}
             className={`btn-premium ${activeTab === 'GAME' ? 'btn-purple' : 'btn-outline'}`}
@@ -1176,7 +1176,7 @@ export default function App() {
         {activeTab === 'CHECKIN' && (
           <div style={{ maxWidth: '600px', margin: '0 auto' }}>
             <div className="glass-card" style={{ padding: '2.5rem', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: '-20px', right: '-20px', opacity: 0.1 }}>
+              <div className="decor-icon" style={{ position: 'absolute', top: '-20px', right: '-20px', opacity: 0.1 }}>
                 <Calendar size={200} color="var(--accent-cyan)" />
               </div>
 
@@ -1290,8 +1290,8 @@ export default function App() {
               </div>
 
               {/* Leaderboard Table */}
-              <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <div style={{ borderRadius: '16px', overflowX: 'auto', border: '1px solid var(--border-color)' }}>
+                <table style={{ width: '100%', minWidth: '550px', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'rgba(15, 8, 30, 0.8)', borderBottom: '1px solid var(--border-color)' }}>
                       <th style={{ padding: '1rem 1.5rem', fontWeight: 600, color: 'var(--text-muted)' }}>Rank</th>

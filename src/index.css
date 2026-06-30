@@ -357,3 +357,48 @@ h1, h2, h3, h4, h5, h6 {
   background: rgba(168, 85, 247, 0.5);
   transform: scale(0.92);
 }
+
+/* --- MOBILE RESPONSIVENESS AND LAYOUT OPTIMIZATIONS --- */
+
+.nav-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 640px) {
+  .nav-tabs {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+/* Responsive padding, text sizes, and CTA visibility adjustments */
+@media (max-width: 640px) {
+  main {
+    margin: 1rem auto !important;
+    padding: 0 1rem !important;
+  }
+  
+  .glass-card {
+    padding: 1.5rem !important;
+  }
+  
+  h2 {
+    font-size: 1.5rem !important;
+  }
+  
+  p {
+    font-size: 0.95rem !important;
+    line-height: 1.4 !important;
+  }
+}
+
+/* Avoid icon visual collisions on small screens */
+@media (max-width: 640px) {
+  .decor-icon {
+    display: none !important;
+  }
+}
