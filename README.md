@@ -13,7 +13,7 @@
 
 - **GitHub Repository**: [https://github.com/OxSakendar/Zenith-Runner](https://github.com/OxSakendar/Zenith-Runner)
 - **GenLayer Smart Contract Source**: [`contracts/zenith_runner.py`](./contracts/zenith_runner.py)
-- **GenLayer Contract Address**: `0xBcBD1169E34799ac9143FD0C350ED06Edb701882`
+- **GenLayer Contract Address**: `0xb4412590158f0CceEc98ebffAFf99C851Ab6703c`
 - **GenLayer Block Explorer**: [https://explorer.testnet-chain.genlayer.com/](https://explorer.testnet-chain.genlayer.com/)
 
 ---

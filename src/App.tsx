@@ -21,7 +21,7 @@ const GENLAYER_CHAIN_NAME = 'GenLayer Testnet Chain';
 const GENLAYER_RPC_URL = 'https://rpc.testnet-chain.genlayer.com/';
 const GENLAYER_EXPLORER_URL = 'https://explorer.testnet-chain.genlayer.com/';
 const CURRENCY_SYMBOL = 'GEN';
-const TREASURY_ADDRESS = '0xBcBD1169E34799ac9143FD0C350ED06Edb701882'; // Game Treasury
+const TREASURY_ADDRESS = '0xb4412590158f0CceEc98ebffAFf99C851Ab6703c'; // Game Treasury / Contract Address
 
 interface LeaderboardEntry {
   address: string;

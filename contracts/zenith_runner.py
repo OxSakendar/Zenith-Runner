@@ -2,7 +2,7 @@
 🌌 Zenith Runner - GenLayer Intelligent Smart Contract
 Chain: GenLayer Testnet
 Language: Python (GenLayer Intelligent Contract Specification)
-Contract Address: 0xBcBD1169E34799ac9143FD0C350ED06Edb701882
+Contract Address: 0xb4412590158f0CceEc98ebffAFf99C851Ab6703c
 """
 
 from typing import List, Dict
