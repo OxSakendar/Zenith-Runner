@@ -15,7 +15,6 @@
 - **GenLayer Smart Contract Source**: [`contracts/zenith_runner.py`](./contracts/zenith_runner.py)
 - **GenLayer Contract Address**: `0xBcBD1169E34799ac9143FD0C350ED06Edb701882`
 - **GenLayer Block Explorer**: [https://explorer.testnet-chain.genlayer.com/](https://explorer.testnet-chain.genlayer.com/)
-- **Local Application URL**: [http://localhost:5173/](http://localhost:5173/)
 
 ---
 
