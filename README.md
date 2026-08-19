@@ -36,7 +36,8 @@ To play Zenith Runner, make sure your Web3 wallet is connected and configured fo
 
 The core Web3 logic of Zenith Runner is powered by a GenLayer Intelligent Smart Contract written in Python. The complete source code is available in the repository at [`contracts/zenith_runner.py`](./contracts/zenith_runner.py).
 
-### Key Contract Methods:
+### Key Contract Methods
+
 1. `authorize_game_session(pilot_address: str)`: Authorizes flight sessions on-chain upon receipt of the **0.01 GEN** session authorization fee.
 2. `submit_high_score(pilot_address: str, score: int, timestamp: str)`: Validates and accumulates pilot high scores on the global GenLayer leaderboard.
 3. `daily_checkin(pilot_address: str, date_str: str)`: Enforces 24-hour daily check-in verification, tracks check-in streaks, and rewards **+10 Bonus Points (BP)**.
@@ -126,8 +127,6 @@ npm install
 cmd /c "npm run dev"
 ```
 
-The application will be accessible at `http://localhost:5173/`.
-
 ### 4. Build for Production
 
 To create a production-ready build:
@@ -185,4 +184,3 @@ Zenith Runner is a non-custodial Web3 application. We do not store, harvest, or 
 
 ---
 *Developed for the GenLayer Testnet Odyssey.*
-
