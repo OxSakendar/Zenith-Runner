@@ -147,33 +147,11 @@ npm run lint
 
 ---
 
-## 📁 Repository Structure
-
-```
-ZENITH RUNNER/
-├── contracts/
-│   └── zenith_runner.py   # GenLayer Intelligent Smart Contract (Python)
-├── public/                # Static assets
-├── src/
-│   ├── assets/            # Project graphics & icons
-│   ├── App.css            # Component-specific styles
-│   ├── App.tsx            # Main game, routing, state, and Web3 logic
-│   ├── index.css          # Core design tokens, gradients, and global styling
-│   └── main.tsx           # React mounting entrypoint
-├── index.html             # Application shell
-├── package.json           # Scripts, dependencies, and manifest
-├── README.md              # Project documentation & evidence links
-├── tsconfig.json          # TypeScript compiler configuration
-└── vite.config.ts         # Vite bundler configuration
-```
-
----
-
 ## 🛠️ Recent Updates (Changelog)
 
-- **GenLayer Intelligent Contract Source Added**: Integrated `contracts/zenith_runner.py` defining full pilot verification, session authorization, daily check-in streaks, and leaderboard data structures.
-- **Repository Evidence & Proof Updated**: Updated README documentation with working repository URL, GenLayer contract address, and testnet explorer tools.
-- **Wallet Connection Toast Resolution**: Resolved an issue where the error toast did not refresh correctly when a user rejected the wallet connection request.
+- **GenLayer Intelligent Contract Implementation**: Created a fully valid GenLayer Intelligent Contract (`contracts/zenith_runner.py`) inheriting `gl.Contract` with GenLayer decorators (`@gl.public.write.payable`, `@gl.public.view`) and state annotations (`owner: Address`, `pilots: TreeMap`, `leaderboard: DynArray`).
+- **Real On-Chain Contract Integration**: Replaced local browser state mutations with real GenLayer contract method calls (`authorize_game_session`, `submit_high_score`, `daily_checkin`) and on-chain state reads (`get_pilot_profile`, `get_leaderboard`) using `genlayer-js`.
+- **GenLayer Service Module**: Added `src/services/genlayerService.ts` for unified RPC & client interaction with GenLayer Testnet.
 - **Enhanced Native Wallet Selection Modal**: Upgraded the wallet connection modal to a clean, native-feeling, glassmorphic selector UI.
 
 ---

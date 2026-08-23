@@ -6,6 +6,14 @@ import {
   Calendar, HelpCircle, ExternalLink, ArrowLeft, ArrowRight,
   X, Send, LogOut
 } from 'lucide-react';
+import { 
+  getPilotProfileOnChain,
+  getLeaderboardOnChain,
+  executeContractAuthorizeSession,
+  executeContractSubmitHighScore,
+  executeContractDailyCheckIn,
+  GENLAYER_CONTRACT_ADDRESS
+} from './services/genlayerService';
 
 // Declare window.ethereum for TypeScript
 declare global {
@@ -21,7 +29,6 @@ const GENLAYER_CHAIN_NAME = 'GenLayer Testnet Chain';
 const GENLAYER_RPC_URL = 'https://rpc.testnet-chain.genlayer.com/';
 const GENLAYER_EXPLORER_URL = 'https://explorer.testnet-chain.genlayer.com/';
 const CURRENCY_SYMBOL = 'GEN';
-const TREASURY_ADDRESS = '0xb4412590158f0CceEc98ebffAFf99C851Ab6703c'; // Game Treasury / Contract Address
 
 interface LeaderboardEntry {
   address: string;
@@ -77,8 +84,8 @@ export default function App() {
   }, [toast]);
 
 
-  // Load account data from localStorage
-  const loadAccountData = useCallback((userAddress: string) => {
+  // Load account data from GenLayer Intelligent Contract with local storage fallback
+  const loadAccountData = useCallback(async (userAddress: string) => {
     const keyPrefix = `genlayer_game_${userAddress.toLowerCase()}`;
     const savedBonus = localStorage.getItem(`${keyPrefix}_bonus`);
     const savedHighScore = localStorage.getItem(`${keyPrefix}_highscore`);
@@ -88,7 +95,39 @@ export default function App() {
     setHighScore(savedHighScore ? parseInt(savedHighScore) : 0);
     setLastCheckIn(savedCheckIn || null);
 
-    // Load leaderboard
+    // Read real pilot profile from GenLayer Intelligent Contract
+    try {
+      const profile = await getPilotProfileOnChain(userAddress);
+      if (profile && profile.registered) {
+        setBonusPoints(profile.bonus_points);
+        setHighScore(profile.high_score);
+        if (profile.last_checkin) setLastCheckIn(profile.last_checkin);
+        localStorage.setItem(`${keyPrefix}_bonus`, profile.bonus_points.toString());
+        localStorage.setItem(`${keyPrefix}_highscore`, profile.high_score.toString());
+        if (profile.last_checkin) localStorage.setItem(`${keyPrefix}_checkin`, profile.last_checkin);
+      }
+    } catch (err) {
+      console.warn('Error reading pilot profile from GenLayer contract:', err);
+    }
+
+    // Read real global leaderboard from GenLayer Intelligent Contract
+    try {
+      const onChainLeaderboard = await getLeaderboardOnChain(310);
+      if (onChainLeaderboard && onChainLeaderboard.length > 0) {
+        const formatted: LeaderboardEntry[] = onChainLeaderboard.map(item => ({
+          address: item.address,
+          score: item.score,
+          date: item.date || item.updated_at || new Date().toISOString().split('T')[0]
+        }));
+        setLeaderboard(formatted);
+        localStorage.setItem('genlayer_leaderboard', JSON.stringify(formatted));
+        return;
+      }
+    } catch (err) {
+      console.warn('Error reading leaderboard from GenLayer contract:', err);
+    }
+
+    // Fallback local storage leaderboard load if on-chain fails
     const savedLeaderboard = localStorage.getItem('genlayer_leaderboard');
     if (savedLeaderboard) {
       try {
@@ -385,8 +424,13 @@ export default function App() {
     }
   };
 
-  // Helper to execute a paid transaction
-  const executeGameTransaction = async (amountGEN: string, title: string, successMsg: string, onSuccess: () => void) => {
+  // Helper to execute contract method transactions with 0.01 GEN fee
+  const executeContractTransaction = async (
+    title: string,
+    action: (provider: ethers.BrowserProvider) => Promise<any>,
+    successMsg: string,
+    onSuccess: () => void
+  ) => {
     if (!account) {
       setShowWalletModal(true);
       return;
@@ -398,81 +442,44 @@ export default function App() {
 
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      let bal = 0n;
-      try {
-        bal = await provider.getBalance(account);
-      } catch (balErr) {
-        console.warn('Failed to fetch balance from GenLayer Testnet RPC, defaulting to 0 for simulation fallback...', balErr);
-      }
-      const requiredWei = ethers.parseEther(amountGEN);
-
-      if (bal < requiredWei) {
-        console.warn(`Low wallet balance (${ethers.formatEther(bal)} GEN). Simulating testnet transaction for Odyssey testing...`);
-        setToast({ type: 'info', message: `Testnet simulation active: Simulating 0.01 GEN fee for ${title}...` });
-      }
 
       setTxLoading({
         active: true,
         title,
-        message: 'Please confirm the transaction in your wallet...',
+        message: 'Please confirm contract transaction in your wallet...',
         step: 1
       });
 
-      let txSuccess = false;
-      try {
-        const signer = await provider.getSigner();
-        const tx = await signer.sendTransaction({
-          to: TREASURY_ADDRESS,
-          value: requiredWei
-        });
+      // Execute Intelligent Contract write call
+      await action(provider);
 
-        setTxLoading({
-          active: true,
-          title,
-          message: 'Transaction submitted! Waiting for real-time GenLayer confirmation...',
-          step: 2
-        });
+      setTxLoading({
+        active: true,
+        title,
+        message: 'Contract method executed! Syncing on-chain state...',
+        step: 2
+      });
 
-        // Race between actual testnet confirmation and a 3-second simulation fallback timeout
-        await Promise.race([
-          tx.wait(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Testnet confirmation timeout simulation')), 3000))
-        ]);
-        txSuccess = true;
-      } catch (txErr: any) {
-        if (txErr?.code === 4001 || txErr?.message?.toLowerCase().includes('rejected')) {
-          throw txErr; // User explicitly cancelled in wallet
-        }
-        console.warn('On-chain transaction failed or simulation active, falling back to simulated GenLayer Testnet confirmation...', txErr);
-        // Simulate testnet confirmation delay
-        await new Promise(resolve => setTimeout(resolve, 1800));
-        txSuccess = true;
-      }
+      // Refresh state from contract
+      await refreshWalletState(provider, account);
+      await loadAccountData(account);
 
-      if (txSuccess) {
-        // Success! Update balance
-        try {
-          await refreshWalletState(provider, account);
-        } catch (refreshErr) {
-          console.warn('Failed to refresh wallet state after tx, continuing simulation...', refreshErr);
-        }
-        onSuccess();
-        setToast({ type: 'success', message: successMsg });
-      }
+      onSuccess();
+      setToast({ type: 'success', message: successMsg });
     } catch (error: any) {
-      console.error('Transaction error:', error);
-      setToast({ type: 'error', message: error.reason || error.message || 'Transaction cancelled or failed.' });
+      console.error('Contract transaction error:', error);
+      setToast({ type: 'error', message: error.reason || error.message || 'Contract method execution failed.' });
     } finally {
       setTxLoading(null);
     }
   };
 
-  // 1. Start Game Session (0.01 GEN required)
+  // 1. Start Game Session (0.01 GEN required -> calls authorize_game_session contract method)
   const handleStartGame = () => {
-    executeGameTransaction(
-      '0.01',
-      'Authorizing Game Session',
-      'Game session authorized! Get ready to dodge and collect!',
+    executeContractTransaction(
+      'Authorizing Game Session (Contract)',
+      (provider) => executeContractAuthorizeSession(account!, provider),
+      'Game session authorized on GenLayer Contract (authorize_game_session)! Get ready to dodge and collect!',
       () => {
         setScore(0);
         shipRef.current.x = 400;
@@ -485,13 +492,15 @@ export default function App() {
     );
   };
 
-  // 2. Submit Score (0.01 GEN required)
+  // 2. Submit High Score (0.01 GEN required -> calls submit_high_score contract method)
   const handleSubmitScore = () => {
     const finalScore = score + bonusPoints;
-    executeGameTransaction(
-      '0.01',
-      'Submitting High Score',
-      `Score of ${finalScore} added successfully to your GenLayer Leaderboard total!`,
+    const timestamp = new Date().toISOString().split('T')[0];
+
+    executeContractTransaction(
+      'Submitting High Score (Contract)',
+      (provider) => executeContractSubmitHighScore(account!, finalScore, timestamp, provider),
+      `Score of ${finalScore} submitted to GenLayer Intelligent Contract (submit_high_score)!`,
       () => {
         const keyPrefix = `genlayer_game_${account?.toLowerCase()}`;
 
@@ -501,15 +510,14 @@ export default function App() {
           let newTotal = finalScore;
           if (existingIdx !== -1) {
             newTotal = updated[existingIdx].score + finalScore;
-            updated[existingIdx] = { ...updated[existingIdx], score: newTotal, date: new Date().toISOString().split('T')[0] };
+            updated[existingIdx] = { ...updated[existingIdx], score: newTotal, date: timestamp };
           } else {
-            updated.push({ address: account || '0xAnon', score: newTotal, date: new Date().toISOString().split('T')[0] });
+            updated.push({ address: account || '0xAnon', score: newTotal, date: timestamp });
           }
           updated.sort((a, b) => b.score - a.score);
           const sliced = updated.slice(0, 310);
           localStorage.setItem('genlayer_leaderboard', JSON.stringify(sliced));
 
-          // Update personal high score state to reflect the new accumulated total
           setHighScore(newTotal);
           localStorage.setItem(`${keyPrefix}_highscore`, newTotal.toString());
 
@@ -522,7 +530,7 @@ export default function App() {
     );
   };
 
-  // 3. Daily Check-in (0.01 GEN required -> gives exactly 10 bonus points)
+  // 3. Daily Check-in (0.01 GEN required -> calls daily_checkin contract method -> grants +10 BP)
   const handleDailyCheckIn = () => {
     const today = new Date().toISOString().split('T')[0];
     if (lastCheckIn === today) {
@@ -530,10 +538,10 @@ export default function App() {
       return;
     }
 
-    executeGameTransaction(
-      '0.01',
-      'Daily Check-In Verification',
-      'Daily check-in successful! +10 Bonus Points added to your profile.',
+    executeContractTransaction(
+      'Daily Check-In (Contract)',
+      (provider) => executeContractDailyCheckIn(account!, today, provider),
+      'Daily check-in verified on GenLayer Intelligent Contract (daily_checkin)! +10 Bonus Points awarded.',
       () => {
         const newBonus = bonusPoints + 10;
         setBonusPoints(newBonus);
@@ -543,7 +551,6 @@ export default function App() {
           localStorage.setItem(`${keyPrefix}_bonus`, newBonus.toString());
           localStorage.setItem(`${keyPrefix}_checkin`, today);
 
-          // Update leaderboard score in real time
           setLeaderboard(prev => {
             const existingIdx = prev.findIndex(e => e.address.toLowerCase() === account.toLowerCase());
             let newTotal = newBonus;
@@ -891,6 +898,19 @@ export default function App() {
 
           {/* Network & Wallet Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            {/* GenLayer Intelligent Contract Link / Badge */}
+            <a 
+              href={`${GENLAYER_EXPLORER_URL}address/${GENLAYER_CONTRACT_ADDRESS}`} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="btn-premium btn-outline" 
+              style={{ padding: '0.5rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem', border: '1px solid rgba(168, 85, 247, 0.4)', color: '#d8b4fe' }}
+              title="View GenLayer Intelligent Contract on Explorer"
+            >
+              <Radio size={15} color="var(--accent-purple)" />
+              Contract: {GENLAYER_CONTRACT_ADDRESS.slice(0, 6)}...{GENLAYER_CONTRACT_ADDRESS.slice(-4)}
+            </a>
+
             {/* Faucet Button */}
             <a 
               href="https://testnet-faucet.genlayer.foundation/" 
