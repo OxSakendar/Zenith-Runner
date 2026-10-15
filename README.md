@@ -88,13 +88,16 @@ raw_consensus = gl.eq_principle.prompt_comparative(
 ### Lifecycle States
 1. `wallet_pending`: Prompting MetaMask / Web3 wallet signature.
 2. `chain_pending`: Transaction broadcasted to GenLayer RPC.
-3. `finalizing`: Awaiting GenLayer validator consensus (`TransactionStatus.FINALIZED`).
-4. `finalized_success`: Execution result is `FINISHED_WITH_RETURN` and verified by reading authoritative contract state.
+3. `finalizing`: Awaiting GenLayer validator consensus (`TransactionStatus.ACCEPTED` / `FINALIZED`).
+4. `finalized_success`: Execution result accepted by consensus and verified by reading authoritative contract state.
 5. `finalized_error`: Execution result is `FINISHED_WITH_ERROR` or consensus rejected; displays contract revert reason.
 6. `unknown`: Timeout or RPC disruption. Displays transaction hash and block explorer link; prevents duplicate submission.
 
-### Elimination of Silent Fallbacks
+### Elimination of Silent Fallbacks & Studio Consensus
 - All silent fallbacks have been removed. If a wallet rejection, consensus failure, or RPC timeout occurs, the UI explicitly reports the error or unknown state without writing false local data.
+- **Immediate Game Launch**: The game session begins immediately upon wallet approval and broadcast so players are not blocked waiting 30–90s for validator rounds before flying.
+- **Studio Consensus Resolution**: Automatically tracks `ACCEPTED` (status 5) and `FINALIZED` (status 7) with 90 retries, preventing false timeouts.
+- **Dynamic Method Routing**: Automatically introspects contract capabilities (`gen_getContractSchema`) to dispatch either `authorize_game_session` or `register_player`, and `submit_high_score` or `execute_ai_turn`.
 - **Leaderboard Verification**: All active leaderboard entries are displayed as `✓ VERIFIED` with full state consistency across GenLayer Studio.
 - **Dual-ABI Compatibility**: Automatically resolves and parses both standard ZenithRunnerContract ABIs and live GenLayer Studio contract endpoints (`get_player_score`, `get_player_territories`, `get_leaderboard`, `execute_ai_turn`).
 

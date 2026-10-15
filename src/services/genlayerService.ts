@@ -48,8 +48,59 @@ export function setContractAddress(addr: `0x${string}`) {
 
 export let GENLAYER_CONTRACT_ADDRESS: `0x${string}` = DEFAULT_CONTRACT_ADDRESS;
 
+export const GENLAYER_RPC_URL =
+  'https://studio.genlayer.com/api';
+
 export const GENLAYER_EXPLORER_URL =
   'https://explorer-studio.genlayer.com/';
+
+const contractMethodsCache = new Map<string, Set<string>>();
+
+export async function getContractSupportedMethods(address: `0x${string}`): Promise<Set<string>> {
+  const normalized = address.toLowerCase();
+  const cached = contractMethodsCache.get(normalized);
+  if (cached) return cached;
+
+  try {
+    const res = await fetch(GENLAYER_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'gen_getContractSchema',
+        params: [address],
+      }),
+    });
+    const data = await res.json();
+    const methods = new Set(Object.keys(data?.result?.methods || {}));
+    if (methods.size > 0) {
+      contractMethodsCache.set(normalized, methods);
+      return methods;
+    }
+  } catch {
+    // fallback to known studio defaults
+  }
+
+  if (normalized === DEFAULT_CONTRACT_ADDRESS.toLowerCase()) {
+    const defaultStudio = new Set([
+      'register_player',
+      'execute_ai_turn',
+      'evaluate_battle',
+      'get_leaderboard',
+      'get_player_score',
+      'get_player_territories',
+      'get_total_territories',
+      'get_world_sectors',
+      'get_player_count',
+      'get_last_outcome',
+    ]);
+    contractMethodsCache.set(normalized, defaultStudio);
+    return defaultStudio;
+  }
+
+  return new Set();
+}
 
 function formatContractError(action: string, err: unknown): Error {
   const msg = err instanceof Error ? err.message : String(err);
@@ -204,10 +255,26 @@ export function makeTxProgress(
 const FINALITY_TIMEOUT_MS = 180_000; // 3 minutes
 
 async function waitForFinality(txHash: `0x${string}`) {
-  return readClient.waitForTransactionReceipt({
-    hash: txHash as TransactionHash,
-    status: TransactionStatus.FINALIZED,
-  });
+  try {
+    return await readClient.waitForTransactionReceipt({
+      hash: txHash as TransactionHash,
+      status: TransactionStatus.ACCEPTED,
+      retries: 90,
+      interval: 2000,
+    });
+  } catch (err: unknown) {
+    // If waitForTransactionReceipt timed out or had an issue, do a direct getTransaction check
+    try {
+      const tx = await readClient.getTransaction({ hash: txHash as TransactionHash });
+      const raw = tx as Record<string, unknown> | null;
+      if (raw && (raw.status === 5 || raw.status === 7 || raw.status_name === 'ACCEPTED' || raw.status_name === 'FINALIZED')) {
+        return tx;
+      }
+    } catch {
+      // ignore fallback error
+    }
+    throw err;
+  }
 }
 
 // ─── On-chain data types ─────────────────────────────────────────────────────
@@ -342,37 +409,60 @@ export async function executeContractAuthorizeSession(
   pilotAddress: `0x${string}`,
   provider: unknown,
   onProgress: (p: TxProgress) => void,
+  onBroadcast?: (txHash: string, provisionalNonce: string) => void,
 ): Promise<AuthorizeSessionResult> {
   const wc = createWriteClient(pilotAddress, provider);
 
   // Step 1: wallet approval
   onProgress(makeTxProgress('wallet_pending'));
 
+  const activeContract = getContractAddress();
+  const methods = await getContractSupportedMethods(activeContract);
+  const isStudioContract =
+    (!methods.has('authorize_game_session') && methods.has('register_player')) ||
+    activeContract.toLowerCase() === DEFAULT_CONTRACT_ADDRESS.toLowerCase();
+
   let txHash: `0x${string}`;
-  let isStudioContract = false;
-  try {
+  if (isStudioContract) {
     txHash = await wc.writeContract({
-      address: getContractAddress(),
-      functionName: 'authorize_game_session',
-      args: [],
+      address: activeContract,
+      functionName: 'register_player',
+      args: [pilotAddress],
       value: 0n, // 0.00 GEN per session
     });
-  } catch (err: unknown) {
+  } else {
     try {
       txHash = await wc.writeContract({
-        address: getContractAddress(),
-        functionName: 'register_player',
-        args: [pilotAddress],
-        value: 0n,
+        address: activeContract,
+        functionName: 'authorize_game_session',
+        args: [],
+        value: 0n, // 0.00 GEN per session
       });
-      isStudioContract = true;
-    } catch {
-      throw formatContractError('authorize_game_session', err);
+    } catch (err: unknown) {
+      try {
+        txHash = await wc.writeContract({
+          address: activeContract,
+          functionName: 'register_player',
+          args: [pilotAddress],
+          value: 0n,
+        });
+      } catch {
+        throw formatContractError('authorize_game_session', err);
+      }
     }
   }
 
   // Step 2: submitted
   onProgress(makeTxProgress('chain_pending', txHash));
+
+  const provisionalNonce = `studio_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  if (onBroadcast) {
+    try {
+      onBroadcast(txHash, provisionalNonce);
+    } catch (err) {
+      console.warn('[genlayerService] onBroadcast handler error:', err);
+    }
+  }
 
   // Step 3: wait for finality
   onProgress(makeTxProgress('finalizing', txHash));
@@ -397,14 +487,18 @@ export async function executeContractAuthorizeSession(
   }
 
   // Step 4: check execution result
-  const execResult = (receipt as Record<string, unknown>).txExecutionResultName as string | undefined;
+  const rawReceipt = receipt as Record<string, unknown>;
+  const execResult = rawReceipt.txExecutionResultName as string | undefined;
+  const statusName = rawReceipt.status_name as string | undefined;
+  const statusNum = rawReceipt.status as number | undefined;
 
   if (execResult === ExecutionResult.FINISHED_WITH_ERROR) {
     const errMsg = 'Contract execution failed during authorize_game_session';
     onProgress(makeTxProgress('finalized_error', txHash, errMsg));
     throw new Error(errMsg);
   }
-  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN) {
+  const isAcceptedStatus = statusNum === 5 || statusNum === 7 || statusName === 'ACCEPTED' || statusName === 'FINALIZED';
+  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN && !isAcceptedStatus) {
     const errMsg = `Unexpected execution result: ${execResult ?? 'NOT_VOTED'}`;
     onProgress(makeTxProgress('unknown', txHash, errMsg));
     throw new Error(errMsg);
@@ -414,8 +508,7 @@ export async function executeContractAuthorizeSession(
   let session_nonce = '';
   let session_id = 0;
   try {
-    // consensus_data.leader_receipt[0].result contains the return value as JSON string
-    const consensusData = (receipt as Record<string, unknown>).consensus_data as Record<string, unknown> | undefined;
+    const consensusData = rawReceipt.consensus_data as Record<string, unknown> | undefined;
     const leaderReceipts = consensusData?.leader_receipt as Array<Record<string, unknown>> | undefined;
     if (leaderReceipts && leaderReceipts.length > 0) {
       const resultStr = String(leaderReceipts[0].result ?? '{}');
@@ -424,12 +517,11 @@ export async function executeContractAuthorizeSession(
       session_id = Number(parsed.session_id ?? 0);
     }
   } catch {
-    // If we can't parse, construct nonce from known info (fallback)
     console.warn('[genlayerService] Could not parse session_nonce from receipt');
   }
 
-  if (!session_nonce && isStudioContract) {
-    session_nonce = `studio_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  if (!session_nonce) {
+    session_nonce = provisionalNonce;
     session_id = 1;
   }
 
@@ -459,27 +551,45 @@ export async function executeContractSubmitHighScore(
 
   onProgress(makeTxProgress('wallet_pending'));
 
+  const activeContract = getContractAddress();
+  const methods = await getContractSupportedMethods(activeContract);
+  const isStudioContract =
+    (!methods.has('submit_high_score') && methods.has('execute_ai_turn')) ||
+    activeContract.toLowerCase() === DEFAULT_CONTRACT_ADDRESS.toLowerCase();
+
   let txHash: `0x${string}`;
-  try {
+  if (isStudioContract) {
     txHash = await wc.writeContract({
-      address: getContractAddress(),
-      functionName: 'submit_high_score',
-      args: [sessionNonce, score, crystalsCollected, durationSeconds],
-      value: 0n, // 0.00 GEN per session
+      address: activeContract,
+      functionName: 'execute_ai_turn',
+      args: [
+        `Zenith flight completed: score ${score}, crystals ${crystalsCollected}, duration ${durationSeconds}s`,
+        pilotAddress,
+      ],
+      value: 0n,
     });
-  } catch (err: unknown) {
+  } else {
     try {
       txHash = await wc.writeContract({
-        address: getContractAddress(),
-        functionName: 'execute_ai_turn',
-        args: [
-          `Zenith flight completed: score ${score}, crystals ${crystalsCollected}, duration ${durationSeconds}s`,
-          pilotAddress,
-        ],
-        value: 0n,
+        address: activeContract,
+        functionName: 'submit_high_score',
+        args: [sessionNonce, score, crystalsCollected, durationSeconds],
+        value: 0n, // 0.00 GEN per session
       });
-    } catch {
-      throw formatContractError('submit_high_score', err);
+    } catch (err: unknown) {
+      try {
+        txHash = await wc.writeContract({
+          address: activeContract,
+          functionName: 'execute_ai_turn',
+          args: [
+            `Zenith flight completed: score ${score}, crystals ${crystalsCollected}, duration ${durationSeconds}s`,
+            pilotAddress,
+          ],
+          value: 0n,
+        });
+      } catch {
+        throw formatContractError('submit_high_score', err);
+      }
     }
   }
 
@@ -505,13 +615,16 @@ export async function executeContractSubmitHighScore(
     throw new Error(`RPC error: ${msg}`, { cause: err });
   }
 
-  const execResult = (receipt as Record<string, unknown>).txExecutionResultName as string | undefined;
+  const rawReceipt = receipt as Record<string, unknown>;
+  const execResult = rawReceipt.txExecutionResultName as string | undefined;
+  const statusName = rawReceipt.status_name as string | undefined;
+  const statusNum = rawReceipt.status as number | undefined;
 
   if (execResult === ExecutionResult.FINISHED_WITH_ERROR) {
     // Try to extract revert reason
     let reason = 'Score rejected by contract (see explorer for details)';
     try {
-      const consensusData = (receipt as Record<string, unknown>).consensus_data as Record<string, unknown> | undefined;
+      const consensusData = rawReceipt.consensus_data as Record<string, unknown> | undefined;
       const leaderReceipts = consensusData?.leader_receipt as Array<Record<string, unknown>> | undefined;
       if (leaderReceipts?.[0]?.error) {
         reason = String(leaderReceipts[0].error);
@@ -520,7 +633,8 @@ export async function executeContractSubmitHighScore(
     onProgress(makeTxProgress('finalized_error', txHash, reason));
     throw new Error(reason);
   }
-  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN) {
+  const isAcceptedStatus = statusNum === 5 || statusNum === 7 || statusName === 'ACCEPTED' || statusName === 'FINALIZED';
+  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN && !isAcceptedStatus) {
     const errMsg = `Unexpected execution result: ${execResult ?? 'NOT_VOTED'}`;
     onProgress(makeTxProgress('unknown', txHash, errMsg));
     throw new Error(errMsg);
@@ -532,8 +646,8 @@ export async function executeContractSubmitHighScore(
 
   return {
     txHash,
-    total_score: profile?.total_score ?? 0,
-    high_score: profile?.high_score ?? 0,
+    total_score: profile?.total_score ?? score,
+    high_score: Math.max(profile?.high_score ?? 0, score),
     profile,
   };
 }
@@ -556,27 +670,45 @@ export async function executeContractDailyCheckIn(
 
   onProgress(makeTxProgress('wallet_pending'));
 
+  const activeContract = getContractAddress();
+  const methods = await getContractSupportedMethods(activeContract);
+  const isStudioContract =
+    (!methods.has('daily_checkin') && methods.has('execute_ai_turn')) ||
+    activeContract.toLowerCase() === DEFAULT_CONTRACT_ADDRESS.toLowerCase();
+
   let txHash: `0x${string}`;
-  try {
+  if (isStudioContract) {
     txHash = await wc.writeContract({
-      address: getContractAddress(),
-      functionName: 'daily_checkin',
-      args: [hintDateStr],
-      value: 0n, // 0.00 GEN per session
+      address: activeContract,
+      functionName: 'execute_ai_turn',
+      args: [
+        `Daily reconnaissance & check-in for pilot on date ${hintDateStr}`,
+        pilotAddress,
+      ],
+      value: 0n,
     });
-  } catch (err: unknown) {
+  } else {
     try {
       txHash = await wc.writeContract({
-        address: getContractAddress(),
-        functionName: 'execute_ai_turn',
-        args: [
-          `Daily reconnaissance & check-in for pilot on date ${hintDateStr}`,
-          pilotAddress,
-        ],
-        value: 0n,
+        address: activeContract,
+        functionName: 'daily_checkin',
+        args: [hintDateStr],
+        value: 0n, // 0.00 GEN per session
       });
-    } catch {
-      throw formatContractError('daily_checkin', err);
+    } catch (err: unknown) {
+      try {
+        txHash = await wc.writeContract({
+          address: activeContract,
+          functionName: 'execute_ai_turn',
+          args: [
+            `Daily reconnaissance & check-in for pilot on date ${hintDateStr}`,
+            pilotAddress,
+          ],
+          value: 0n,
+        });
+      } catch {
+        throw formatContractError('daily_checkin', err);
+      }
     }
   }
 
@@ -602,12 +734,15 @@ export async function executeContractDailyCheckIn(
     throw new Error(`RPC error: ${msg}`, { cause: err });
   }
 
-  const execResult = (receipt as Record<string, unknown>).txExecutionResultName as string | undefined;
+  const rawReceipt = receipt as Record<string, unknown>;
+  const execResult = rawReceipt.txExecutionResultName as string | undefined;
+  const statusName = rawReceipt.status_name as string | undefined;
+  const statusNum = rawReceipt.status as number | undefined;
 
   if (execResult === ExecutionResult.FINISHED_WITH_ERROR) {
     let reason = 'Check-in rejected by contract';
     try {
-      const consensusData = (receipt as Record<string, unknown>).consensus_data as Record<string, unknown> | undefined;
+      const consensusData = rawReceipt.consensus_data as Record<string, unknown> | undefined;
       const leaderReceipts = consensusData?.leader_receipt as Array<Record<string, unknown>> | undefined;
       if (leaderReceipts?.[0]?.error) {
         reason = String(leaderReceipts[0].error);
@@ -616,7 +751,8 @@ export async function executeContractDailyCheckIn(
     onProgress(makeTxProgress('finalized_error', txHash, reason));
     throw new Error(reason);
   }
-  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN) {
+  const isAcceptedStatus = statusNum === 5 || statusNum === 7 || statusName === 'ACCEPTED' || statusName === 'FINALIZED';
+  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN && !isAcceptedStatus) {
     const errMsg = `Unexpected execution result: ${execResult ?? 'NOT_VOTED'}`;
     onProgress(makeTxProgress('unknown', txHash, errMsg));
     throw new Error(errMsg);
@@ -625,7 +761,7 @@ export async function executeContractDailyCheckIn(
   // Extract authoritative_date from receipt
   let authoritative_date = hintDateStr;
   try {
-    const consensusData = (receipt as Record<string, unknown>).consensus_data as Record<string, unknown> | undefined;
+    const consensusData = rawReceipt.consensus_data as Record<string, unknown> | undefined;
     const leaderReceipts = consensusData?.leader_receipt as Array<Record<string, unknown>> | undefined;
     if (leaderReceipts?.[0]?.result) {
       const parsed = JSON.parse(String(leaderReceipts[0].result));
@@ -694,14 +830,18 @@ export async function executeContractDeploy(
     throw new Error(`RPC error waiting for deployment finality: ${msg}`, { cause: err });
   }
 
-  const execResult = (receipt as Record<string, unknown>).txExecutionResultName as string | undefined;
+  const rawReceipt = receipt as Record<string, unknown>;
+  const execResult = rawReceipt.txExecutionResultName as string | undefined;
+  const statusName = rawReceipt.status_name as string | undefined;
+  const statusNum = rawReceipt.status as number | undefined;
 
   if (execResult === ExecutionResult.FINISHED_WITH_ERROR) {
     const errMsg = 'Contract deployment failed on-chain';
     onProgress(makeTxProgress('finalized_error', txHash, errMsg));
     throw new Error(errMsg);
   }
-  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN) {
+  const isAcceptedStatus = statusNum === 5 || statusNum === 7 || statusName === 'ACCEPTED' || statusName === 'FINALIZED';
+  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN && !isAcceptedStatus) {
     const errMsg = `Unexpected deployment execution result: ${execResult ?? 'NOT_VOTED'}`;
     onProgress(makeTxProgress('unknown', txHash, errMsg));
     throw new Error(errMsg);

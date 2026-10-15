@@ -513,7 +513,7 @@ export default function App() {
     });
   }, [account, isWrongNetwork, runContractWrite, loadAccountData]);
 
-  // 1. Start Game Session (0.01 GEN → authorize_game_session)
+  // 1. Start Game Session (0.00 GEN → authorize_game_session / register_player)
   const handleStartGame = useCallback(() => {
     if (!contractExists) {
       setToast({
@@ -527,22 +527,29 @@ export default function App() {
         account as `0x${string}`,
         window.ethereum,
         onProgress,
-      );
-      // Store single-use session nonce for anti-cheat
-      sessionNonceRef.current = result.session_nonce;
-      crystalsCollectedRef.current = 0;
-      sessionStartRef.current = Math.floor(Date.now() / 1000);
+        (_txHash, provisionalNonce) => {
+          // Immediately start game upon wallet approval & broadcast so user is never blocked
+          sessionNonceRef.current = provisionalNonce;
+          crystalsCollectedRef.current = 0;
+          sessionStartRef.current = Math.floor(Date.now() / 1000);
 
-      // Reset game state
-      setScore(0);
-      setShields(100);
-      shipRef.current.x = 400;
-      shipRef.current.shields = 100;
-      crystalsRef.current = [];
-      asteroidsRef.current = [];
-      particlesRef.current = [];
+          setScore(0);
+          setShields(100);
+          shipRef.current.x = 400;
+          shipRef.current.shields = 100;
+          crystalsRef.current = [];
+          asteroidsRef.current = [];
+          particlesRef.current = [];
+          setGameState('PLAYING');
+          setToast({ type: 'success', message: 'Session approved & broadcasted! Fly safe, pilot.' });
+        }
+      );
+      // Store single-use session nonce for anti-cheat once confirmed on-chain
+      if (result.session_nonce) {
+        sessionNonceRef.current = result.session_nonce;
+      }
       setGameState('PLAYING');
-      setToast({ type: 'success', message: 'Session authorized! Fly safe, pilot.' });
+      setToast({ type: 'success', message: 'Session confirmed on GenLayer Studio!' });
     });
   }, [runContractWrite, account, contractExists]);
 
