@@ -6,13 +6,16 @@ import {
   Calendar, HelpCircle, ExternalLink, ArrowLeft, ArrowRight,
   X, Send, LogOut
 } from 'lucide-react';
+import contractCodeRaw from '../contracts/zenith_runner.py?raw';
 import {
   getPilotProfileOnChain,
   getLeaderboardOnChain,
   executeContractAuthorizeSession,
   executeContractSubmitHighScore,
   executeContractDailyCheckIn,
-  GENLAYER_CONTRACT_ADDRESS,
+  executeContractDeploy,
+  checkContractExists,
+  getContractAddress,
   type TxProgress,
 } from './services/genlayerService';
 
@@ -74,6 +77,9 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [onlineCount, setOnlineCount] = useState<number>(42);
   const [shields, setShields] = useState<number>(100);
+  const [contractAddress, setContractAddressState] = useState<string>(getContractAddress());
+  const [contractExists, setContractExists] = useState<boolean>(true);
+  const [isDeploying, setIsDeploying] = useState<boolean>(false);
 
   // Canvas Ref & Game Loop variables
   const manuallyDisconnectedRef = useRef<boolean>(false);
@@ -110,6 +116,11 @@ export default function App() {
     setBonusPoints(savedBonus ? parseInt(savedBonus) : 0);
     setHighScore(savedHighScore ? parseInt(savedHighScore) : 0);
     setLastCheckIn(savedCheckIn || null);
+
+    // Verify whether contract is deployed on chain
+    const exists = await checkContractExists();
+    setContractExists(exists);
+    setContractAddressState(getContractAddress());
 
     // Read real pilot profile from GenLayer Intelligent Contract
     try {
@@ -473,8 +484,41 @@ export default function App() {
     }
   }, [account, isWrongNetwork]);
 
+  // Deploy Intelligent Contract (one-time deployment from connected wallet)
+  const handleDeployContract = useCallback(() => {
+    if (!account) { setShowWalletModal(true); return; }
+    if (isWrongNetwork) { switchNetwork(); return; }
+    setIsDeploying(true);
+    runContractWrite(async (onProgress) => {
+      try {
+        const result = await executeContractDeploy(
+          account as `0x${string}`,
+          contractCodeRaw,
+          window.ethereum,
+          onProgress,
+        );
+        setContractAddressState(result.contractAddress);
+        setContractExists(true);
+        setToast({
+          type: 'success',
+          message: `Contract deployed at ${result.contractAddress.slice(0, 6)}...${result.contractAddress.slice(-4)}! Ready to play.`,
+        });
+        await loadAccountData(account);
+      } finally {
+        setIsDeploying(false);
+      }
+    });
+  }, [account, isWrongNetwork, runContractWrite, loadAccountData]);
+
   // 1. Start Game Session (0.01 GEN → authorize_game_session)
   const handleStartGame = useCallback(() => {
+    if (!contractExists) {
+      setToast({
+        type: 'error',
+        message: 'Contract not initialized on this testnet. Click "Deploy Zenith Contract" above to deploy it.',
+      });
+      return;
+    }
     runContractWrite(async (onProgress) => {
       const result = await executeContractAuthorizeSession(
         account as `0x${string}`,
@@ -497,7 +541,7 @@ export default function App() {
       setGameState('PLAYING');
       setToast({ type: 'success', message: 'Session authorized! Fly safe, pilot.' });
     });
-  }, [runContractWrite, account]);
+  }, [runContractWrite, account, contractExists]);
 
   // 2. Submit High Score (0.01 GEN → submit_high_score with evidence)
   const handleSubmitScore = useCallback(() => {
@@ -930,7 +974,7 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             {/* GenLayer Intelligent Contract Link / Badge */}
             <a 
-              href={`${GENLAYER_EXPLORER_URL}address/${GENLAYER_CONTRACT_ADDRESS}`} 
+              href={`${GENLAYER_EXPLORER_URL}address/${contractAddress}`} 
               target="_blank" 
               rel="noreferrer" 
               className="btn-premium btn-outline" 
@@ -938,7 +982,7 @@ export default function App() {
               title="View GenLayer Intelligent Contract on Explorer"
             >
               <Radio size={15} color="var(--accent-purple)" />
-              Contract: {GENLAYER_CONTRACT_ADDRESS.slice(0, 6)}...{GENLAYER_CONTRACT_ADDRESS.slice(-4)}
+              Contract: {contractAddress.slice(0, 6)}...{contractAddress.slice(-4)}
             </a>
 
             {/* Faucet Button */}
@@ -1102,6 +1146,32 @@ export default function App() {
             <span>Rules & Info</span>
           </button>
         </div>
+
+        {/* CONTRACT DEPLOYMENT BANNER IF UNINITIALIZED ON CHAIN */}
+        {!contractExists && account && (
+          <div style={{ maxWidth: '900px', margin: '0 auto 1.5rem', width: '100%', padding: '1.2rem 1.8rem', background: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', maxWidth: '620px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <AlertTriangle size={22} color="#f59e0b" />
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '0.95rem' }}>Contract Not Yet Initialized on Current Testnet</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.15rem' }}>
+                  Address <code style={{ color: '#d8b4fe' }}>{contractAddress.slice(0, 6)}...{contractAddress.slice(-4)}</code> is not registered on GenLayer Bradbury. Click deploy to initialize your contract on-chain with your connected wallet.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleDeployContract}
+              disabled={isDeploying}
+              className="btn-premium"
+              style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)', padding: '0.6rem 1.4rem', fontSize: '0.88rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+            >
+              <Zap size={16} />
+              {isDeploying ? 'Deploying...' : '🚀 Deploy Zenith Contract'}
+            </button>
+          </div>
+        )}
 
         {/* TAB 1: GAME ARENA */}
         {activeTab === 'GAME' && (

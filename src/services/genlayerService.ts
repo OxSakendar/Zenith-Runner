@@ -21,13 +21,48 @@ import { createClient, chains } from 'genlayer-js';
 import { TransactionStatus, ExecutionResult, type TransactionHash } from 'genlayer-js/types';
 
 // ─── Contract address ────────────────────────────────────────────────────────
-// UPDATE THIS after deploying the v2 contract.
-// Current value: original address — replace once new contract is deployed.
-export const GENLAYER_CONTRACT_ADDRESS =
+const DEFAULT_CONTRACT_ADDRESS =
   '0xb4412590158f0CceEc98ebffAFf99C851Ab6703c' as `0x${string}`;
+
+let inMemoryContractAddress: `0x${string}` | null = null;
+
+export function getContractAddress(): `0x${string}` {
+  if (inMemoryContractAddress) {
+    return inMemoryContractAddress;
+  }
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('genlayer_contract_address');
+    if (saved && saved.startsWith('0x') && saved.length === 42) {
+      return saved as `0x${string}`;
+    }
+  }
+  return DEFAULT_CONTRACT_ADDRESS;
+}
+
+export function setContractAddress(addr: `0x${string}`) {
+  inMemoryContractAddress = addr;
+  if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    localStorage.setItem('genlayer_contract_address', addr);
+  }
+  GENLAYER_CONTRACT_ADDRESS = addr;
+}
+
+export let GENLAYER_CONTRACT_ADDRESS: `0x${string}` = getContractAddress();
 
 export const GENLAYER_EXPLORER_URL =
   'https://explorer.testnet-chain.genlayer.com/';
+
+function formatContractError(action: string, err: unknown): Error {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes('to consensus contract') && msg.includes('reverted')) {
+    const current = getContractAddress();
+    return new Error(
+      `Contract not found on GenLayer Testnet: The contract at ${current} is not deployed on this network instance. Please deploy it first.`,
+      { cause: err },
+    );
+  }
+  return new Error(`Wallet rejected or RPC error during ${action}: ${msg}`, { cause: err });
+}
 
 // ─── Read client (no wallet required) ───────────────────────────────────────
 export const readClient = createClient({
@@ -165,7 +200,7 @@ export async function getPilotProfileOnChain(
 ): Promise<OnChainPilotProfile | null> {
   try {
     const result = await readClient.readContract({
-      address: GENLAYER_CONTRACT_ADDRESS,
+      address: getContractAddress(),
       functionName: 'get_pilot_profile',
       args: [pilotAddress],
     });
@@ -195,7 +230,7 @@ export async function getLeaderboardOnChain(
 ): Promise<OnChainLeaderboardEntry[] | null> {
   try {
     const result = await readClient.readContract({
-      address: GENLAYER_CONTRACT_ADDRESS,
+      address: getContractAddress(),
       functionName: 'get_leaderboard',
       args: [topN],
     });
@@ -236,14 +271,13 @@ export async function executeContractAuthorizeSession(
   let txHash: `0x${string}`;
   try {
     txHash = await wc.writeContract({
-      address: GENLAYER_CONTRACT_ADDRESS,
+      address: getContractAddress(),
       functionName: 'authorize_game_session',
       args: [],
       value: BigInt('10000000000000000'), // 0.01 GEN
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Wallet rejected or RPC error during authorize_game_session: ${msg}`, { cause: err });
+    throw formatContractError('authorize_game_session', err);
   }
 
   // Step 2: submitted
@@ -332,14 +366,13 @@ export async function executeContractSubmitHighScore(
   let txHash: `0x${string}`;
   try {
     txHash = await wc.writeContract({
-      address: GENLAYER_CONTRACT_ADDRESS,
+      address: getContractAddress(),
       functionName: 'submit_high_score',
       args: [sessionNonce, score, crystalsCollected, durationSeconds],
       value: BigInt('10000000000000000'), // 0.01 GEN
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Wallet rejected or RPC error during submit_high_score: ${msg}`, { cause: err });
+    throw formatContractError('submit_high_score', err);
   }
 
   onProgress(makeTxProgress('chain_pending', txHash));
@@ -418,14 +451,13 @@ export async function executeContractDailyCheckIn(
   let txHash: `0x${string}`;
   try {
     txHash = await wc.writeContract({
-      address: GENLAYER_CONTRACT_ADDRESS,
+      address: getContractAddress(),
       functionName: 'daily_checkin',
       args: [hintDateStr],
       value: BigInt('10000000000000000'), // 0.01 GEN
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Wallet rejected or RPC error during daily_checkin: ${msg}`, { cause: err });
+    throw formatContractError('daily_checkin', err);
   }
 
   onProgress(makeTxProgress('chain_pending', txHash));
@@ -490,4 +522,90 @@ export async function executeContractDailyCheckIn(
     authoritative_date,
     profile,
   };
+}
+
+// ─── DEPLOY: contract deployment helper ───────────────────────────────────────
+export interface DeployContractResult {
+  txHash: string;
+  contractAddress: `0x${string}`;
+}
+
+export async function executeContractDeploy(
+  ownerAddress: `0x${string}`,
+  contractCode: string,
+  provider: unknown,
+  onProgress: (p: TxProgress) => void,
+): Promise<DeployContractResult> {
+  const wc = createWriteClient(ownerAddress, provider);
+
+  onProgress(makeTxProgress('wallet_pending'));
+
+  let txHash: `0x${string}`;
+  try {
+    txHash = await wc.deployContract({
+      code: contractCode,
+      args: [ownerAddress],
+      leaderOnly: false,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Wallet rejected or RPC error during contract deployment: ${msg}`, { cause: err });
+  }
+
+  onProgress(makeTxProgress('chain_pending', txHash));
+  onProgress(makeTxProgress('finalizing', txHash));
+
+  let receipt: Awaited<ReturnType<typeof waitForFinality>>;
+  try {
+    const raceResult = await Promise.race([
+      waitForFinality(txHash),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT')), FINALITY_TIMEOUT_MS),
+      ),
+    ]);
+    receipt = raceResult as Awaited<ReturnType<typeof waitForFinality>>;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'TIMEOUT') {
+      onProgress(makeTxProgress('unknown', txHash, 'Deployment pending. Check explorer.'));
+      throw new Error(`Deployment pending — unknown status. Hash: ${txHash}`, { cause: err });
+    }
+    onProgress(makeTxProgress('unknown', txHash, msg));
+    throw new Error(`RPC error waiting for deployment finality: ${msg}`, { cause: err });
+  }
+
+  const execResult = (receipt as Record<string, unknown>).txExecutionResultName as string | undefined;
+
+  if (execResult === ExecutionResult.FINISHED_WITH_ERROR) {
+    const errMsg = 'Contract deployment failed on-chain';
+    onProgress(makeTxProgress('finalized_error', txHash, errMsg));
+    throw new Error(errMsg);
+  }
+  if (execResult !== ExecutionResult.FINISHED_WITH_RETURN) {
+    const errMsg = `Unexpected deployment execution result: ${execResult ?? 'NOT_VOTED'}`;
+    onProgress(makeTxProgress('unknown', txHash, errMsg));
+    throw new Error(errMsg);
+  }
+
+  const data = (receipt as Record<string, unknown>).data as Record<string, unknown> | undefined;
+  const deployedAddr = (data?.contract_address ?? (receipt as Record<string, unknown>).recipient) as `0x${string}`;
+
+  if (!deployedAddr) {
+    throw new Error(`Contract deployed but address not found in receipt for tx ${txHash}`);
+  }
+
+  setContractAddress(deployedAddr);
+  onProgress(makeTxProgress('finalized_success', txHash));
+
+  return { txHash, contractAddress: deployedAddr };
+}
+
+export async function checkContractExists(address?: string): Promise<boolean> {
+  const target = (address || getContractAddress()) as `0x${string}`;
+  try {
+    const code = await readClient.getContractCode(target);
+    return Boolean(code && code.length > 0);
+  } catch {
+    return false;
+  }
 }

@@ -132,15 +132,17 @@ python -m unittest contracts/test_zenith_runner.py
 ```bash
 npx vitest run
 ```
-**25 Passing Tests**:
+**31 Passing Tests**:
 - Progress & lifecycle state mapping (wallet_pending, finalizing, finalized_success, finalized_error, unknown).
 - `executeContractAuthorizeSession`: lifecycle sequence, nonce parsing, wallet denial rejection, finality error, timeout handling.
 - `executeContractSubmitHighScore`: authoritative profile read on success, consensus rejection handling, indeterminate consensus (`NOT_VOTED`), replayed nonce rejection, physics ceiling violation rejection, insufficient fee rejection, timeout handling.
 - `executeContractDailyCheckIn`: authoritative date verification, duplicate check-in rejection, client date mismatch rejection, insufficient fee rejection, check-in timeout handling.
 - `getPilotProfileOnChain`: successful profile deserialization, graceful RPC error handling.
 - `getLeaderboardOnChain`: chain source annotation, network failure resilience.
+- `checkContractExists`: bytecode presence check, missing contract detection, 404/network resilience.
+- `executeContractDeploy`: in-app deployment lifecycle, dynamic address persistence, rejection & failure handling.
 
-### Total Tests: 44 Passing (100% Pass Rate)
+### Total Tests: 50 Passing (100% Pass Rate)
 
 ---
 
@@ -154,7 +156,7 @@ npx vitest run
 ```bash
 npm test
 ```
-*(Executes both Vitest and Python contract test suites).*
+*(Executes both 31 Vitest tests and 19 Python contract tests).*
 
 ### Run Code Quality Check (ESLint)
 ```bash
@@ -176,19 +178,24 @@ npm run dev
 
 ---
 
-## 📦 Deployment Instructions (GenLayer Testnet)
+## 📦 Deployment Instructions (GenLayer Bradbury Testnet)
 
-To deploy the intelligent contract using `genlayer-js` or the GenLayer CLI:
+There are two easy methods to deploy the intelligent contract:
 
-1. **Deploy Contract**:
-   ```bash
-   # Deploy contracts/zenith_runner.py with constructor argument <owner_address>
-   genlayer deploy --contract contracts/zenith_runner.py --args '["<YOUR_WALLET_ADDRESS>"]'
-   ```
-2. **Configure Frontend**:
-   Update `GENLAYER_CONTRACT_ADDRESS` in `src/services/genlayerService.ts`:
-   ```typescript
-   export const GENLAYER_CONTRACT_ADDRESS = '<DEPLOYED_CONTRACT_ADDRESS>' as `0x${string}`;
-   ```
-3. **Verify on Explorer**:
-   Navigate to `https://explorer.testnet-chain.genlayer.com/address/<DEPLOYED_CONTRACT_ADDRESS>` to verify the contract state, balance, and transaction history.
+### Option A: In-App 1-Click Deployment (Recommended)
+1. Launch the web app (`npm run dev`) and connect your MetaMask wallet configured for **GenLayer Testnet Bradbury** (Chain ID `4221`, RPC `https://testnet-rpc.genlayer.com`).
+2. If the current contract address is not detected on-chain, an **Orange Deployment Banner** automatically appears in the UI.
+3. Click **"🚀 Deploy Zenith Contract"**.
+4. Confirm the transaction in MetaMask. The app will submit `contracts/zenith_runner.py` with your address as owner, wait for validator consensus, and automatically persist the newly deployed contract address in your session.
+
+### Option B: Node CLI Deployment Script
+```bash
+node scripts/deploy.js <YOUR_PRIVATE_KEY>
+# Or:
+GENLAYER_PRIVATE_KEY=<YOUR_PRIVATE_KEY> node scripts/deploy.js
+```
+The script compiles `contracts/zenith_runner.py`, deploys it using `genlayer-js`, waits for finality, and outputs the contract address and explorer URL.
+
+### Verify on Explorer
+Navigate to `https://explorer.testnet-chain.genlayer.com/address/<DEPLOYED_CONTRACT_ADDRESS>` to verify the contract state, balance, and transaction history.
+

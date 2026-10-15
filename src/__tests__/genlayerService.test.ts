@@ -16,10 +16,18 @@ import {
 } from '../services/genlayerService';
 
 // ── Mock genlayer-js entirely ────────────────────────────────────────────────
-const { mockWriteContract, mockWaitForTransactionReceipt, mockReadContract } = vi.hoisted(() => ({
+const {
+  mockWriteContract,
+  mockWaitForTransactionReceipt,
+  mockReadContract,
+  mockDeployContract,
+  mockGetContractCode,
+} = vi.hoisted(() => ({
   mockWriteContract: vi.fn(),
   mockWaitForTransactionReceipt: vi.fn(),
   mockReadContract: vi.fn(),
+  mockDeployContract: vi.fn(),
+  mockGetContractCode: vi.fn(),
 }));
 
 vi.mock('genlayer-js', () => ({
@@ -27,6 +35,8 @@ vi.mock('genlayer-js', () => ({
     writeContract: mockWriteContract,
     waitForTransactionReceipt: mockWaitForTransactionReceipt,
     readContract: mockReadContract,
+    deployContract: mockDeployContract,
+    getContractCode: mockGetContractCode,
   })),
   chains: {
     testnetBradbury: { id: 4221, name: 'GenLayer Testnet', nativeCurrency: { symbol: 'GEN' } },
@@ -394,3 +404,100 @@ describe('getLeaderboardOnChain()', () => {
     expect(result![0].score).toBe(500);
   });
 });
+
+describe('checkContractExists()', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('returns true when getContractCode returns non-empty bytecode', async () => {
+    mockGetContractCode.mockResolvedValue('0x608060405234801561001057600080fd5b50');
+    const { checkContractExists } = await getService();
+    const exists = await checkContractExists('0x1234567890123456789012345678901234567890');
+    expect(exists).toBe(true);
+  });
+
+  it('returns false when getContractCode returns empty or null', async () => {
+    mockGetContractCode.mockResolvedValue('');
+    const { checkContractExists } = await getService();
+    const exists = await checkContractExists('0x1234567890123456789012345678901234567890');
+    expect(exists).toBe(false);
+  });
+
+  it('returns false when getContractCode throws (e.g. 404 or network error)', async () => {
+    mockGetContractCode.mockRejectedValue(new Error('Contract not found'));
+    const { checkContractExists } = await getService();
+    const exists = await checkContractExists('0x1234567890123456789012345678901234567890');
+    expect(exists).toBe(false);
+  });
+});
+
+describe('executeContractDeploy()', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('successful deployment updates contract address and returns result', async () => {
+    const mockTxHash = '0xdeploytx123';
+    const mockDeployedAddr = '0x1234567890123456789012345678901234567890' as `0x${string}`;
+    mockDeployContract.mockResolvedValue(mockTxHash);
+    mockWaitForTransactionReceipt.mockResolvedValue({
+      status: 'FINALIZED',
+      txExecutionResultName: 'FINISHED_WITH_RETURN',
+      data: { contract_address: mockDeployedAddr },
+    });
+
+    const progressStatuses: TxLifecycleStatus[] = [];
+    const { executeContractDeploy, getContractAddress } = await getService();
+
+    const res = await executeContractDeploy(
+      PILOT,
+      'class ZenithRunner: pass',
+      {},
+      (p) => progressStatuses.push(p.status),
+    );
+
+    expect(res.txHash).toBe(mockTxHash);
+    expect(res.contractAddress).toBe(mockDeployedAddr);
+    expect(getContractAddress().toLowerCase()).toBe(mockDeployedAddr.toLowerCase());
+    expect(progressStatuses).toContain('wallet_pending');
+    expect(progressStatuses).toContain('chain_pending');
+    expect(progressStatuses).toContain('finalizing');
+    expect(progressStatuses).toContain('finalized_success');
+  });
+
+  it('wallet rejection throws and does not progress to chain_pending', async () => {
+    mockDeployContract.mockRejectedValue(new Error('User rejected deployment'));
+    const progressStatuses: TxLifecycleStatus[] = [];
+    const { executeContractDeploy } = await getService();
+
+    await expect(
+      executeContractDeploy(PILOT, 'class ZenithRunner: pass', {}, (p) =>
+        progressStatuses.push(p.status),
+      ),
+    ).rejects.toThrow(/User rejected deployment/);
+
+    expect(progressStatuses).toEqual(['wallet_pending']);
+  });
+
+  it('finalized with error emits finalized_error and throws', async () => {
+    const mockTxHash = '0xdeploytxfail';
+    mockDeployContract.mockResolvedValue(mockTxHash);
+    mockWaitForTransactionReceipt.mockResolvedValue({
+      status: 'FINALIZED',
+      txExecutionResultName: 'FINISHED_WITH_ERROR',
+    });
+
+    const progressStatuses: TxLifecycleStatus[] = [];
+    const { executeContractDeploy } = await getService();
+
+    await expect(
+      executeContractDeploy(PILOT, 'class ZenithRunner: pass', {}, (p) =>
+        progressStatuses.push(p.status),
+      ),
+    ).rejects.toThrow(/Contract deployment failed on-chain/);
+
+    expect(progressStatuses).toContain('finalized_error');
+  });
+});
+
