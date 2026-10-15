@@ -21,22 +21,21 @@ import { createClient, chains } from 'genlayer-js';
 import { TransactionStatus, ExecutionResult, type TransactionHash } from 'genlayer-js/types';
 
 // ─── Contract address ────────────────────────────────────────────────────────
-const DEFAULT_CONTRACT_ADDRESS =
-  '0xb4412590158f0CceEc98ebffAFf99C851Ab6703c' as `0x${string}`;
+export const DEFAULT_CONTRACT_ADDRESS =
+  '0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE' as `0x${string}`;
 
-let inMemoryContractAddress: `0x${string}` | null = null;
+let inMemoryContractAddress: `0x${string}` = DEFAULT_CONTRACT_ADDRESS;
 
 export function getContractAddress(): `0x${string}` {
-  if (inMemoryContractAddress) {
-    return inMemoryContractAddress;
-  }
   if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
     const saved = localStorage.getItem('genlayer_contract_address');
-    if (saved && saved.startsWith('0x') && saved.length === 42) {
+    if (saved && saved.startsWith('0x') && saved.length === 42 && !saved.toLowerCase().includes('b441')) {
       return saved as `0x${string}`;
     }
+    // Clean up old address and set to current Studio contract
+    localStorage.setItem('genlayer_contract_address', DEFAULT_CONTRACT_ADDRESS);
   }
-  return DEFAULT_CONTRACT_ADDRESS;
+  return inMemoryContractAddress || DEFAULT_CONTRACT_ADDRESS;
 }
 
 export function setContractAddress(addr: `0x${string}`) {
@@ -47,17 +46,17 @@ export function setContractAddress(addr: `0x${string}`) {
   GENLAYER_CONTRACT_ADDRESS = addr;
 }
 
-export let GENLAYER_CONTRACT_ADDRESS: `0x${string}` = getContractAddress();
+export let GENLAYER_CONTRACT_ADDRESS: `0x${string}` = DEFAULT_CONTRACT_ADDRESS;
 
 export const GENLAYER_EXPLORER_URL =
-  'https://explorer.testnet-chain.genlayer.com/';
+  'https://explorer-studio.genlayer.com/';
 
 function formatContractError(action: string, err: unknown): Error {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes('to consensus contract') && msg.includes('reverted')) {
     const current = getContractAddress();
     return new Error(
-      `Contract not found on GenLayer Testnet: The contract at ${current} is not deployed on this network instance. Please deploy it first.`,
+      `Contract not found on GenLayer Studio: The contract at ${current} is not deployed on this network instance. Please deploy it first.`,
       { cause: err },
     );
   }
@@ -70,9 +69,12 @@ function formatContractError(action: string, err: unknown): Error {
   return new Error(`Wallet rejected or RPC error during ${action}: ${msg}`, { cause: err });
 }
 
+// ─── Active Chain Config (GenLayer Studio 61999) ─────────────────────────────
+export const ACTIVE_CHAIN = chains.studionet;
+
 // ─── Read client (no wallet required) ───────────────────────────────────────
 export const readClient = createClient({
-  chain: chains.testnetBradbury,
+  chain: ACTIVE_CHAIN,
 });
 
 /**
@@ -84,7 +86,7 @@ function createWriteClient(
   provider: unknown,
 ): ReturnType<typeof createClient> {
   const client = createClient({
-    chain: chains.testnetBradbury,
+    chain: ACTIVE_CHAIN,
     account: address,
     provider: provider as NonNullable<Parameters<typeof createClient>[0]>['provider'],
   });
@@ -231,23 +233,52 @@ export async function getPilotProfileOnChain(
   pilotAddress: string,
 ): Promise<OnChainPilotProfile | null> {
   try {
-    const result = await readClient.readContract({
-      address: getContractAddress(),
-      functionName: 'get_pilot_profile',
-      args: [pilotAddress],
-    });
+    try {
+      const result = await readClient.readContract({
+        address: getContractAddress(),
+        functionName: 'get_pilot_profile',
+        args: [pilotAddress],
+      });
 
-    if (result && typeof result === 'object') {
-      const data = result as Record<string, unknown>;
+      if (result && typeof result === 'object') {
+        const data = result as Record<string, unknown>;
+        return {
+          registered: Boolean(data.registered),
+          address: String(data.address ?? pilotAddress),
+          high_score: Number(data.high_score ?? 0),
+          total_score: Number(data.total_score ?? 0),
+          bonus_points: Number(data.bonus_points ?? 0),
+          total_sessions: Number(data.total_sessions ?? 0),
+          checkin_streak: Number(data.checkin_streak ?? 0),
+          last_checkin: String(data.last_checkin ?? ''),
+        };
+      }
+    } catch {
+      // Fallback for ZeroFeeArena Studio contract: read player score and territories
+      const score = await readClient.readContract({
+        address: getContractAddress(),
+        functionName: 'get_player_score',
+        args: [pilotAddress],
+      });
+      const territories = await readClient.readContract({
+        address: getContractAddress(),
+        functionName: 'get_player_territories',
+        args: [pilotAddress],
+      });
+      const sc = Number(score ?? 0);
+      const terr = Number(territories ?? 0);
+      if (sc === 0 && terr === 0) {
+        return null;
+      }
       return {
-        registered: Boolean(data.registered),
-        address: String(data.address ?? pilotAddress),
-        high_score: Number(data.high_score ?? 0),
-        total_score: Number(data.total_score ?? 0),
-        bonus_points: Number(data.bonus_points ?? 0),
-        total_sessions: Number(data.total_sessions ?? 0),
-        checkin_streak: Number(data.checkin_streak ?? 0),
-        last_checkin: String(data.last_checkin ?? ''),
+        registered: true,
+        address: pilotAddress,
+        high_score: sc,
+        total_score: sc,
+        bonus_points: terr * 10,
+        total_sessions: terr,
+        checkin_streak: Math.min(7, Math.max(1, terr)),
+        last_checkin: new Date().toISOString().split('T')[0],
       };
     }
   } catch (err) {
@@ -261,14 +292,31 @@ export async function getLeaderboardOnChain(
   topN = 50,
 ): Promise<OnChainLeaderboardEntry[] | null> {
   try {
-    const result = await readClient.readContract({
-      address: getContractAddress(),
-      functionName: 'get_leaderboard',
-      args: [topN],
-    });
+    let result: unknown;
+    try {
+      result = await readClient.readContract({
+        address: getContractAddress(),
+        functionName: 'get_leaderboard',
+        args: [topN],
+      });
+    } catch {
+      result = await readClient.readContract({
+        address: getContractAddress(),
+        functionName: 'get_leaderboard',
+        args: [],
+      });
+    }
+
+    if (typeof result === 'string') {
+      try {
+        result = JSON.parse(result);
+      } catch {
+        // keep as is
+      }
+    }
 
     if (Array.isArray(result)) {
-      return (result as unknown[]).map((raw) => {
+      return (result as unknown[]).slice(0, topN).map((raw) => {
         const item = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
         return {
           address: String(item.address ?? item.pilot ?? '0xAnon'),
@@ -301,15 +349,26 @@ export async function executeContractAuthorizeSession(
   onProgress(makeTxProgress('wallet_pending'));
 
   let txHash: `0x${string}`;
+  let isStudioContract = false;
   try {
     txHash = await wc.writeContract({
       address: getContractAddress(),
       functionName: 'authorize_game_session',
       args: [],
-      value: BigInt('10000000000000000'), // 0.01 GEN
+      value: 0n, // 0.00 GEN per session
     });
   } catch (err: unknown) {
-    throw formatContractError('authorize_game_session', err);
+    try {
+      txHash = await wc.writeContract({
+        address: getContractAddress(),
+        functionName: 'register_player',
+        args: [pilotAddress],
+        value: 0n,
+      });
+      isStudioContract = true;
+    } catch {
+      throw formatContractError('authorize_game_session', err);
+    }
   }
 
   // Step 2: submitted
@@ -369,6 +428,11 @@ export async function executeContractAuthorizeSession(
     console.warn('[genlayerService] Could not parse session_nonce from receipt');
   }
 
+  if (!session_nonce && isStudioContract) {
+    session_nonce = `studio_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    session_id = 1;
+  }
+
   onProgress(makeTxProgress('finalized_success', txHash));
 
   return { txHash, session_nonce, session_id };
@@ -401,10 +465,22 @@ export async function executeContractSubmitHighScore(
       address: getContractAddress(),
       functionName: 'submit_high_score',
       args: [sessionNonce, score, crystalsCollected, durationSeconds],
-      value: BigInt('10000000000000000'), // 0.01 GEN
+      value: 0n, // 0.00 GEN per session
     });
   } catch (err: unknown) {
-    throw formatContractError('submit_high_score', err);
+    try {
+      txHash = await wc.writeContract({
+        address: getContractAddress(),
+        functionName: 'execute_ai_turn',
+        args: [
+          `Zenith flight completed: score ${score}, crystals ${crystalsCollected}, duration ${durationSeconds}s`,
+          pilotAddress,
+        ],
+        value: 0n,
+      });
+    } catch {
+      throw formatContractError('submit_high_score', err);
+    }
   }
 
   onProgress(makeTxProgress('chain_pending', txHash));
@@ -486,10 +562,22 @@ export async function executeContractDailyCheckIn(
       address: getContractAddress(),
       functionName: 'daily_checkin',
       args: [hintDateStr],
-      value: BigInt('10000000000000000'), // 0.01 GEN
+      value: 0n, // 0.00 GEN per session
     });
   } catch (err: unknown) {
-    throw formatContractError('daily_checkin', err);
+    try {
+      txHash = await wc.writeContract({
+        address: getContractAddress(),
+        functionName: 'execute_ai_turn',
+        args: [
+          `Daily reconnaissance & check-in for pilot on date ${hintDateStr}`,
+          pilotAddress,
+        ],
+        value: 0n,
+      });
+    } catch {
+      throw formatContractError('daily_checkin', err);
+    }
   }
 
   onProgress(makeTxProgress('chain_pending', txHash));

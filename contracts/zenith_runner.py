@@ -21,7 +21,7 @@ import json
 import re
 
 # Constants
-SESSION_FEE_WEI = 10000000000000000   # 0.01 GEN in wei
+SESSION_FEE_WEI = 0                    # 0.00 GEN per session (free gameplay mode)
 MAX_SCORE       = 5000                 # absolute ceiling
 MIN_SCORE       = 0
 MAX_CRYSTALS    = 500
@@ -67,7 +67,7 @@ class ZenithRunnerContract(gl.Contract):
     def authorize_game_session(self) -> dict:
         """
         Authorizes a new flight session for the calling pilot.
-        Requires exactly >= 0.01 GEN session fee.
+        Requires >= 0.00 GEN session fee.
 
         Returns a single-use session_nonce the client MUST include
         in the subsequent submit_high_score call.
@@ -77,7 +77,7 @@ class ZenithRunnerContract(gl.Contract):
         # --- Fee check (deterministic) ---
         if gl.message.value < SESSION_FEE_WEI:
             raise ValueError(
-                f"Insufficient session fee: need >= 0.01 GEN "
+                f"Insufficient session fee: need >= 0.00 GEN "
                 f"(got {gl.message.value} wei)"
             )
 
@@ -103,7 +103,7 @@ class ZenithRunnerContract(gl.Contract):
             "pilot": str(pilot),
             "session_nonce": nonce,
             "session_id": session_id,
-            "fee_verified": "0.01 GEN",
+            "fee_verified": "0.00 GEN",
         }
 
     # ─────────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ class ZenithRunnerContract(gl.Contract):
         # ── 1. Fee check ──────────────────────────────────────────────
         if gl.message.value < SESSION_FEE_WEI:
             raise ValueError(
-                f"Insufficient fee: need >= 0.01 GEN (got {gl.message.value} wei)"
+                f"Insufficient fee: need >= 0.00 GEN (got {gl.message.value} wei)"
             )
 
         # ── 2. Input bounds (deterministic — fast reject before consensus) ─
@@ -297,7 +297,7 @@ class ZenithRunnerContract(gl.Contract):
         """
         Verifies daily pilot check-in using an authoritative external time source.
         Grants +10 Bonus Points upon successful daily verification.
-        Requires >= 0.01 GEN check-in fee.
+        Requires >= 0.00 GEN check-in fee.
 
         The authoritative UTC date is fetched from worldtimeapi.org inside the
         non-deterministic block.  hint_date_str (YYYY-MM-DD) is validated against
@@ -310,7 +310,7 @@ class ZenithRunnerContract(gl.Contract):
         # ── 1. Fee check ──────────────────────────────────────────────
         if gl.message.value < SESSION_FEE_WEI:
             raise ValueError(
-                f"Insufficient fee: need >= 0.01 GEN (got {gl.message.value} wei)"
+                f"Insufficient fee: need >= 0.00 GEN (got {gl.message.value} wei)"
             )
 
         # ── 2. Validate hint format (deterministic) ───────────────────

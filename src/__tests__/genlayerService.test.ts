@@ -40,6 +40,7 @@ vi.mock('genlayer-js', () => ({
   })),
   chains: {
     testnetBradbury: { id: 4221, name: 'GenLayer Testnet', nativeCurrency: { symbol: 'GEN' } },
+    studionet: { id: 61999, name: 'GenLayer Studio', nativeCurrency: { symbol: 'GEN' } },
   },
 }));
 

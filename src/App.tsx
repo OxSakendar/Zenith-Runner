@@ -33,12 +33,12 @@ declare global {
   }
 }
 
-// GenLayer Testnet Constants
-const GENLAYER_CHAIN_ID = 4221;
-const GENLAYER_CHAIN_ID_HEX = '0x107d'; // 4221 in hex
-const GENLAYER_CHAIN_NAME = 'GenLayer Testnet Chain';
-const GENLAYER_RPC_URL = 'https://rpc.testnet-chain.genlayer.com/';
-const GENLAYER_EXPLORER_URL = 'https://explorer.testnet-chain.genlayer.com/';
+// GenLayer Studio Constants
+const GENLAYER_CHAIN_ID = 61999;
+const GENLAYER_CHAIN_ID_HEX = '0xf22f'; // 61999 in hex
+const GENLAYER_CHAIN_NAME = 'GenLayer Studio';
+const GENLAYER_RPC_URL = 'https://studio.genlayer.com/api';
+const GENLAYER_EXPLORER_URL = 'https://explorer-studio.genlayer.com/';
 const CURRENCY_SYMBOL = 'GEN';
 
 interface LeaderboardEntry {
@@ -77,7 +77,7 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [onlineCount, setOnlineCount] = useState<number>(42);
   const [shields, setShields] = useState<number>(100);
-  const [contractAddress, setContractAddressState] = useState<string>(getContractAddress());
+  const [contractAddress, setContractAddressState] = useState<string>(getContractAddress);
   const [contractExists, setContractExists] = useState<boolean>(true);
   const [isDeploying, setIsDeploying] = useState<boolean>(false);
 
@@ -985,17 +985,6 @@ export default function App() {
               Contract: {contractAddress.slice(0, 6)}...{contractAddress.slice(-4)}
             </a>
 
-            {/* Faucet Button */}
-            <a 
-              href="https://testnet-faucet.genlayer.foundation/" 
-              target="_blank" 
-              rel="noreferrer" 
-              className="btn-premium btn-outline" 
-              style={{ padding: '0.5rem 1rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <Zap size={16} color="var(--accent-cyan)" /> Get Testnet GEN
-            </a>
-
             {account && (
               <div className="glass-card" style={{ padding: '0.4rem 1rem', display: 'flex', alignItems: 'center', gap: '0.8rem', borderRadius: '12px', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.9rem' }}>
@@ -1101,12 +1090,12 @@ export default function App() {
               <div>
                 <h3 style={{ fontSize: '1.2rem', fontWeight: 700, margin: '0 0 0.2rem 0', color: '#fde68a' }}>Wrong Network Detected</h3>
                 <p style={{ color: '#fef3c7', fontSize: '0.95rem', margin: 0 }}>
-                  This game operates exclusively on the GenLayer Testnet (Chain ID 4221). Please switch your network to continue playing.
+                  This game operates on GenLayer Studio (Chain ID 61999). Please switch your network to continue playing.
                 </p>
               </div>
             </div>
             <button onClick={switchNetwork} className="btn-premium btn-warning">
-              Switch Network Automatically
+              Switch to GenLayer Studio
             </button>
           </div>
         )}
@@ -1155,9 +1144,9 @@ export default function App() {
                 <AlertTriangle size={22} color="#f59e0b" />
               </div>
               <div>
-                <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '0.95rem' }}>Contract Not Yet Initialized on Current Testnet</div>
+                <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '0.95rem' }}>Contract Not Yet Initialized on Current Network</div>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.15rem' }}>
-                  Address <code style={{ color: '#d8b4fe' }}>{contractAddress.slice(0, 6)}...{contractAddress.slice(-4)}</code> is not registered on GenLayer Bradbury. Click deploy to initialize your contract on-chain with your connected wallet.
+                  Address <code style={{ color: '#d8b4fe' }}>{contractAddress.slice(0, 6)}...{contractAddress.slice(-4)}</code> is not registered on GenLayer Studio. Click deploy to initialize your contract on-chain with your connected wallet.
                 </div>
               </div>
             </div>
@@ -1209,7 +1198,7 @@ export default function App() {
                     </div>
                     <h2 className="overlay-title" style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '1rem' }}>Ready for Launch?</h2>
                     <p className="overlay-desc" style={{ color: 'var(--text-muted)', marginBottom: '1.8rem', fontSize: '1.05rem', lineHeight: 1.5 }}>
-                      Collect cyan GEN energy crystals to score points. Dodge dark matter asteroids and <span style={{ color: '#f43f5e', fontWeight: 600 }}>avoid red corrupted crystals</span> (touching red is instant Game Over!). Requires <span className="text-glow-cyan font-semibold">0.01 GEN</span> per session.
+                      Collect cyan GEN energy crystals to score points. Dodge dark matter asteroids and <span style={{ color: '#f43f5e', fontWeight: 600 }}>avoid red corrupted crystals</span> (touching red is instant Game Over!). Requires <span className="text-glow-cyan font-semibold">0.00 GEN</span> per session.
                     </p>
 
                     {!account ? (
@@ -1222,7 +1211,7 @@ export default function App() {
                       </button>
                     ) : (
                       <button onClick={handleStartGame} className="btn-premium btn-cyan" style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}>
-                        <Play size={20} /> Start Game (0.01 GEN)
+                        <Play size={20} /> Start Game (0.00 GEN)
                       </button>
                     )}
                   </div>
@@ -1255,10 +1244,10 @@ export default function App() {
 
                     <div className="overlay-actions" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                       <button onClick={handleSubmitScore} className="btn-premium btn-purple" style={{ width: '100%', padding: '1rem', fontSize: '1.05rem' }}>
-                        <Trophy size={20} /> Submit Score & Rank Up (0.01 GEN)
+                        <Trophy size={20} /> Submit Score & Rank Up (0.00 GEN)
                       </button>
                       <button onClick={handleStartGame} className="btn-premium btn-outline" style={{ width: '100%', padding: '0.8rem' }}>
-                        <RefreshCw size={18} /> Play Again (0.01 GEN)
+                        <RefreshCw size={18} /> Play Again (0.00 GEN)
                       </button>
                     </div>
                   </div>
@@ -1339,7 +1328,7 @@ export default function App() {
                   style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
                 >
                   <Calendar size={20} /> 
-                  {lastCheckIn === new Date().toISOString().split('T')[0] ? 'Checked In for Today' : 'Claim 10 Bonus Points (0.01 GEN)'}
+                  {lastCheckIn === new Date().toISOString().split('T')[0] ? 'Checked In for Today' : 'Claim 10 Bonus Points (0.00 GEN)'}
                 </button>
               )}
             </div>
@@ -1513,15 +1502,15 @@ export default function App() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
                 <div className="glass-card" style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.3)' }}>
                   <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.8rem', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Coins size={20} /> Mandatory Game Fees (0.01 GEN)
+                    <Coins size={20} /> Zero Game Fees (0.00 GEN)
                   </h3>
                   <p style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    To ensure real-time chain validation and prevent spam on the GenLayer Testnet, all core actions require a micro-transaction of exactly 0.01 GEN:
+                    To ensure real-time chain validation and seamless gameplay on GenLayer Studio, all core actions require 0.00 GEN (free transactions):
                   </p>
                   <ul style={{ color: 'var(--text-main)', marginTop: '0.8rem', paddingLeft: '1.5rem', lineHeight: 1.8 }}>
-                    <li><strong style={{ color: '#d8b4fe' }}>Gameplay Start:</strong> 0.01 GEN required to initialize game physics and authorize session.</li>
-                    <li><strong style={{ color: '#d8b4fe' }}>Score Submission:</strong> 0.01 GEN required to permanently record your score on the on-chain leaderboard.</li>
-                    <li><strong style={{ color: '#d8b4fe' }}>Daily Check-In:</strong> 0.01 GEN required to claim your daily streak reward of exactly 10 bonus points.</li>
+                    <li><strong style={{ color: '#d8b4fe' }}>Gameplay Start:</strong> 0.00 GEN required to initialize game physics and authorize session.</li>
+                    <li><strong style={{ color: '#d8b4fe' }}>Score Submission:</strong> 0.00 GEN required to permanently record your score on the on-chain leaderboard.</li>
+                    <li><strong style={{ color: '#d8b4fe' }}>Daily Check-In:</strong> 0.00 GEN required to claim your daily streak reward of exactly 10 bonus points.</li>
                   </ul>
                 </div>
 
@@ -1551,9 +1540,6 @@ export default function App() {
                     </div>
                   </div>
                   <div style={{ marginTop: '1.2rem', textAlign: 'center', display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <a href="https://testnet-faucet.genlayer.foundation/" target="_blank" rel="noreferrer" className="btn-premium btn-cyan" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', padding: '0.6rem 1.2rem' }}>
-                      <Zap size={16} /> Open GenLayer Faucet
-                    </a>
                     <a href={GENLAYER_EXPLORER_URL} target="_blank" rel="noreferrer" className="btn-premium btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', padding: '0.6rem 1.2rem' }}>
                       <ExternalLink size={16} /> Open GenLayer Block Explorer
                     </a>
@@ -1661,7 +1647,7 @@ export default function App() {
                     <strong style={{ color: 'var(--text-main)' }}>1. Acceptance of Terms:</strong> By connecting your Web3 wallet and engaging with the Zenith Runner cyber arena, you agree to operate within the decentralized parameters established on the GenLayer Testnet.
                   </p>
                   <p>
-                    <strong style={{ color: 'var(--text-main)' }}>2. Testnet Execution & Fees:</strong> All in-game transactions, including game initialization (0.01 GEN), score submissions (0.01 GEN), and daily check-ins (0.01 GEN), utilize testnet utility tokens. These tokens hold no real-world monetary value and are designated strictly for ecosystem simulation.
+                    <strong style={{ color: 'var(--text-main)' }}>2. Testnet Execution & Fees:</strong> All in-game transactions, including game initialization (0.00 GEN), score submissions (0.00 GEN), and daily check-ins (0.00 GEN), utilize testnet utility tokens. These tokens hold no real-world monetary value and are designated strictly for ecosystem simulation.
                   </p>
                   <p>
                     <strong style={{ color: 'var(--text-main)' }}>3. Decentralized Verification:</strong> Leaderboard rankings and bonus point allocations are validated via intelligent contracts on the GenLayer blockchain. Zenith Runner does not guarantee uninterrupted network uptime during testnet phases.

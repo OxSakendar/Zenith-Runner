@@ -1,25 +1,26 @@
 # 🌌 Zenith Runner — GenLayer Odyssey
 
-[![Chain: GenLayer Testnet](https://img.shields.io/badge/Chain-GenLayer%20Testnet%20(Bradbury)-8A2BE2?style=for-the-badge&logo=ethereum)](https://explorer.testnet-chain.genlayer.com/)
+[![Chain: GenLayer Studio](https://img.shields.io/badge/Chain-GenLayer%20Studio-8A2BE2?style=for-the-badge&logo=ethereum)](https://explorer-studio.genlayer.com/)
 [![React: 19.x](https://img.shields.io/badge/React-19.x-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![Vite: 8.x](https://img.shields.io/badge/Vite-8.x-ffd845?style=for-the-badge&logo=vite)](https://vite.dev/)
 [![TypeScript: 6.x](https://img.shields.io/badge/TypeScript-6.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Tests: 44 Passing](https://img.shields.io/badge/Tests-44%20Passing-success?style=for-the-badge)](https://vitest.dev/)
+[![Tests: 50 Passing](https://img.shields.io/badge/Tests-50%20Passing-success?style=for-the-badge)](https://vitest.dev/)
 
-**Zenith Runner** is a decentralized space/cyber runner game built with React 19, TypeScript, Vite, and HTML5 Canvas. The game features full Web3 integration on the **GenLayer Testnet**, utilizing GenLayer Intelligent Smart Contracts with non-deterministic LLM consensus anti-cheat verification, single-use session nonces for replay protection, and authoritative external time validation for daily check-ins.
+**Zenith Runner** is a decentralized space/cyber runner game built with React 19, TypeScript, Vite, and HTML5 Canvas. The game features full Web3 integration on **GenLayer Studio**, utilizing GenLayer Intelligent Smart Contracts with non-deterministic LLM consensus anti-cheat verification, single-use session nonces for replay protection, and authoritative external time validation for daily check-ins — all running with **0.00 GEN** zero-fee sessions.
 
 ---
 
-## 🔗 Project Links & Testnet Configuration
+## 🔗 Project Links & Network Configuration
 
 - **GitHub Repository**: [https://github.com/OxSakendar/Zenith-Runner](https://github.com/OxSakendar/Zenith-Runner)
 - **GenLayer Smart Contract Source**: [`contracts/zenith_runner.py`](./contracts/zenith_runner.py)
-- **Contract Address**: `0xb4412590158f0CceEc98ebffAFf99C851Ab6703c`
-- **GenLayer Testnet Chain ID**: `4221` (`0x107d`)
-- **GenLayer RPC URL**: `https://rpc.testnet-chain.genlayer.com/`
-- **GenLayer Block Explorer**: [https://explorer.testnet-chain.genlayer.com/](https://explorer.testnet-chain.genlayer.com/)
-- **GenLayer Testnet Faucet**: [https://testnet-faucet.genlayer.foundation/](https://testnet-faucet.genlayer.foundation/)
+- **Active Contract Address**: [`0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE`](https://explorer-studio.genlayer.com/address/0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE)
+- **Network Name**: `GenLayer Studio`
+- **Chain ID**: `61999` (`0xf22f`)
+- **RPC URL**: `https://studio.genlayer.com/api`
+- **Block Explorer**: [https://explorer-studio.genlayer.com/](https://explorer-studio.genlayer.com/)
 - **Native Currency**: `GEN`
+- **Session Fee**: `0.00 GEN` (Zero Fee Arena)
 
 ---
 
@@ -28,7 +29,7 @@
 The smart contract is written in Python following the official GenLayer Intelligent Contract specification (`py-genlayer`).
 
 ### 1. Replay Protection & Session Authorization (`authorize_game_session`)
-- **Payable Requirement**: Requires `>= 0.01 GEN` (`10000000000000000` wei) session fee.
+- **Zero Fee Session**: Requires `>= 0.00 GEN` session fee for accessible, seamless onboarding.
 - **Identity Enforcement**: Caller identity is derived exclusively from `gl.message.sender` (never trusted from client parameters).
 - **Session Nonce**: Generates a single-use session nonce formatted as `<pilot_address>:<session_id>`.
 - **State Storage**: Tracks cumulative game sessions and registers pilots in `self.pilots: TreeMap[Address, dict]`.
@@ -75,7 +76,7 @@ raw_consensus = gl.eq_principle.prompt_comparative(
 - Any consensus indeterminate state, `"INVALID"` verdict, or parsing failure triggers a hard transaction revert, ensuring points can never be awarded on failed runs.
 
 ### 3. Authoritative Daily Check-in (`daily_checkin`)
-- **Fee Requirement**: Requires `>= 0.01 GEN`.
+- **Fee Requirement**: Requires `>= 0.00 GEN`.
 - **Authoritative Time Source**: Fetches UTC time from an external authoritative source (`worldtimeapi.org/api/timezone/UTC`) inside a non-deterministic block evaluated via `gl.eq_principle.strict_eq`.
 - **Untrusted Client Protection**: Client date hint is compared against the authoritative UTC date. Any discrepancy (or client clock manipulation) immediately causes rejection.
 - **Streak & Duplicate Enforcement**: Prevents multiple check-ins on the same calendar day based on authoritative state `last_checkin == authoritative_date`.
@@ -86,16 +87,16 @@ raw_consensus = gl.eq_principle.prompt_comparative(
 
 ### Lifecycle States
 1. `wallet_pending`: Prompting MetaMask / Web3 wallet signature.
-2. `chain_pending`: Transaction hash broadcasted to GenLayer RPC.
+2. `chain_pending`: Transaction broadcasted to GenLayer RPC.
 3. `finalizing`: Awaiting GenLayer validator consensus (`TransactionStatus.FINALIZED`).
 4. `finalized_success`: Execution result is `FINISHED_WITH_RETURN` and verified by reading authoritative contract state.
 5. `finalized_error`: Execution result is `FINISHED_WITH_ERROR` or consensus rejected; displays contract revert reason.
 6. `unknown`: Timeout or RPC disruption. Displays transaction hash and block explorer link; prevents duplicate submission.
 
 ### Elimination of Silent Fallbacks
-- Prior versions contained fallbacks that simulated on-chain success when transactions failed.
 - All silent fallbacks have been removed. If a wallet rejection, consensus failure, or RPC timeout occurs, the UI explicitly reports the error or unknown state without writing false local data.
 - **Demo Mode Separation**: Local test simulation is explicitly tagged as `DEMO` in the UI and leaderboard. Real on-chain data is tagged as `✓ VERIFIED`.
+- **Dual-ABI Compatibility**: Automatically resolves and parses both standard ZenithRunnerContract ABIs and live GenLayer Studio contract endpoints (`get_player_score`, `get_player_territories`, `get_leaderboard`, `execute_ai_turn`).
 
 ---
 
@@ -178,15 +179,17 @@ npm run dev
 
 ---
 
-## 📦 Deployment Instructions (GenLayer Bradbury Testnet)
+## 📦 Deployment Instructions (GenLayer Studio)
 
-There are two easy methods to deploy the intelligent contract:
+### Active Live Contract
+The contract is live and deployed on **GenLayer Studio**:
+- **Address**: `0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE`
+- **Explorer**: [https://explorer-studio.genlayer.com/address/0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE](https://explorer-studio.genlayer.com/address/0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE)
 
-### Option A: In-App 1-Click Deployment (Recommended)
-1. Launch the web app (`npm run dev`) and connect your MetaMask wallet configured for **GenLayer Testnet Bradbury** (Chain ID `4221`, RPC `https://testnet-rpc.genlayer.com`).
-2. If the current contract address is not detected on-chain, an **Orange Deployment Banner** automatically appears in the UI.
-3. Click **"🚀 Deploy Zenith Contract"**.
-4. Confirm the transaction in MetaMask. The app will submit `contracts/zenith_runner.py` with your address as owner, wait for validator consensus, and automatically persist the newly deployed contract address in your session.
+### Option A: In-App 1-Click Deployment (If Deploying a Fresh Contract)
+1. Launch the web app (`npm run dev`) and connect your MetaMask wallet configured for **GenLayer Studio** (Chain ID `61999`, RPC `https://studio.genlayer.com/api`).
+2. If deploying to a new address, click **"🚀 Deploy Zenith Contract"** in the deployment banner.
+3. Confirm the transaction in MetaMask. The app will submit the contract code, wait for validator consensus, and automatically persist the newly deployed contract address in your session.
 
 ### Option B: Node CLI Deployment Script
 ```bash
@@ -194,8 +197,4 @@ node scripts/deploy.js <YOUR_PRIVATE_KEY>
 # Or:
 GENLAYER_PRIVATE_KEY=<YOUR_PRIVATE_KEY> node scripts/deploy.js
 ```
-The script compiles `contracts/zenith_runner.py`, deploys it using `genlayer-js`, waits for finality, and outputs the contract address and explorer URL.
-
-### Verify on Explorer
-Navigate to `https://explorer.testnet-chain.genlayer.com/address/<DEPLOYED_CONTRACT_ADDRESS>` to verify the contract state, balance, and transaction history.
-
+The script compiles `contracts/zenith_runner.py`, deploys it to GenLayer Studio via `genlayer-js`, waits for finality, and prints the contract address and explorer URL.

@@ -22,7 +22,7 @@ async function main() {
   console.log(`Deployer address: ${account.address}`);
 
   const client = createClient({
-    chain: chains.testnetBradbury,
+    chain: chains.studionet,
     account,
   });
 
@@ -46,7 +46,7 @@ async function main() {
   };
 
   const contractCode = readFileSync('./contracts/zenith_runner.py', 'utf-8');
-  console.log('Deploying ZenithRunnerContract to GenLayer Testnet Bradbury (Chain 4221)...');
+  console.log('Deploying ZenithRunnerContract to GenLayer Studio (Chain 61999)...');
 
   const txHash = await client.deployContract({
     code: contractCode,
@@ -66,7 +66,7 @@ async function main() {
   console.log('====================================================');
   console.log('SUCCESS! Zenith Runner Contract is Live on GenLayer!');
   console.log(`Contract Address: ${contractAddress}`);
-  console.log(`Explorer: https://explorer.testnet-chain.genlayer.com/address/${contractAddress}`);
+  console.log(`Explorer: https://explorer-studio.genlayer.com/address/${contractAddress}`);
   console.log('====================================================');
 }
 
