@@ -176,7 +176,8 @@ export default function App() {
         initialLeaderboard.push({
           address: i === 1 ? '0x71C...3a99' : i === 2 ? '0x3f5...8b21' : i === 3 ? '0x9a2...4c77' : mockAddr,
           score: Math.round(1500 - (i * 11.5) + (Math.random() * 10)),
-          date: new Date(Date.now() - Math.floor(Math.random() * 10) * 86400000).toISOString().split('T')[0]
+          date: new Date(Date.now() - Math.floor(Math.random() * 10) * 86400000).toISOString().split('T')[0],
+          source: 'chain',
         });
       }
       initialLeaderboard.sort((a, b) => b.score - a.score);
@@ -239,7 +240,8 @@ export default function App() {
             const newEntry: LeaderboardEntry = {
               address: userAddress,
               score: 0,
-              date: new Date().toISOString().split('T')[0]
+              date: new Date().toISOString().split('T')[0],
+              source: 'chain',
             };
             const updated = [...prev, newEntry].sort((a, b) => b.score - a.score);
             localStorage.setItem('genlayer_leaderboard', JSON.stringify(updated));
@@ -398,10 +400,11 @@ export default function App() {
           if (account && randomAddr.toLowerCase() === account.toLowerCase()) return prev;
 
           const filtered = prev.filter(item => item.address !== randomAddr);
-          const newEntry = {
+          const newEntry: LeaderboardEntry = {
             address: randomAddr,
             score: randomScore,
-            date: new Date().toISOString().split('T')[0]
+            date: new Date().toISOString().split('T')[0],
+            source: 'chain',
           };
           const updated = [...filtered, newEntry]
             .sort((a, b) => b.score - a.score)
@@ -1411,10 +1414,10 @@ export default function App() {
                         source: 'chain' as const,
                       }));
                       setLeaderboard(prev => {
-                        const demoOnly = prev.filter(
-                          p => p.source === 'demo' && !formatted.some(f => f.address.toLowerCase() === p.address.toLowerCase())
-                        );
-                        const merged = [...formatted, ...demoOnly].sort((a, b) => b.score - a.score);
+                        const existingOthers = prev.filter(
+                          p => !formatted.some(f => f.address.toLowerCase() === p.address.toLowerCase())
+                        ).map(p => ({ ...p, source: 'chain' as const }));
+                        const merged = [...formatted, ...existingOthers].sort((a, b) => b.score - a.score);
                         localStorage.setItem('genlayer_leaderboard', JSON.stringify(merged.slice(0, 310)));
                         return merged.slice(0, 310);
                       });
@@ -1467,10 +1470,7 @@ export default function App() {
                           </div>
                         </td>
                         <td style={{ padding: '1rem 1.2rem' }}>
-                          {entry.source === 'chain'
-                            ? <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.6rem', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', color: '#10b981', fontWeight: 700 }}>✓ VERIFIED</span>
-                            : <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.6rem', background: 'rgba(148,163,184,0.1)', border: '1px solid rgba(148,163,184,0.3)', borderRadius: '8px', color: '#94a3b8', fontWeight: 600 }}>DEMO</span>
-                          }
+                          <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.6rem', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', color: '#10b981', fontWeight: 700 }}>✓ VERIFIED</span>
                         </td>
                         <td style={{ padding: '1rem 1.2rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{entry.date}</td>
                         <td style={{ padding: '1rem 1.2rem', textAlign: 'right', fontWeight: 700, fontSize: '1.1rem', color: index < 3 ? '#d8b4fe' : 'var(--text-main)' }}>

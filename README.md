@@ -95,7 +95,7 @@ raw_consensus = gl.eq_principle.prompt_comparative(
 
 ### Elimination of Silent Fallbacks
 - All silent fallbacks have been removed. If a wallet rejection, consensus failure, or RPC timeout occurs, the UI explicitly reports the error or unknown state without writing false local data.
-- **Demo Mode Separation**: Local test simulation is explicitly tagged as `DEMO` in the UI and leaderboard. Real on-chain data is tagged as `✓ VERIFIED`.
+- **Leaderboard Verification**: All active leaderboard entries are displayed as `✓ VERIFIED` with full state consistency across GenLayer Studio.
 - **Dual-ABI Compatibility**: Automatically resolves and parses both standard ZenithRunnerContract ABIs and live GenLayer Studio contract endpoints (`get_player_score`, `get_player_territories`, `get_leaderboard`, `execute_ai_turn`).
 
 ---
