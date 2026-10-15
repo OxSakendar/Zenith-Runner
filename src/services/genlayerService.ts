@@ -61,6 +61,12 @@ function formatContractError(action: string, err: unknown): Error {
       { cause: err },
     );
   }
+  if (msg.includes('intrinsic gas too low') || msg.includes('Custom eth_sendRawTransaction')) {
+    return new Error(
+      `Gas limit error during ${action}: Transaction gas limit was lower than payload intrinsic gas. Retrying with safe gas buffer.`,
+      { cause: err },
+    );
+  }
   return new Error(`Wallet rejected or RPC error during ${action}: ${msg}`, { cause: err });
 }
 
@@ -77,11 +83,37 @@ function createWriteClient(
   address: `0x${string}`,
   provider: unknown,
 ): ReturnType<typeof createClient> {
-  return createClient({
+  const client = createClient({
     chain: chains.testnetBradbury,
     account: address,
     provider: provider as NonNullable<Parameters<typeof createClient>[0]>['provider'],
   });
+
+  // GenLayer SDK defaults to 200,000 gas when eth_estimateGas reverts.
+  // Large payloads (such as Python contract deployment) require >340,000 intrinsic gas,
+  // causing eth_sendRawTransaction to reject with "intrinsic gas too low".
+  // We wrap estimateTransactionGas to guarantee at least intrinsic gas + 1.5M buffer.
+  const originalEstimate = client.estimateTransactionGas?.bind(client);
+  client.estimateTransactionGas = async (params) => {
+    const hexData = params.data || '';
+    const byteCount = hexData.startsWith('0x')
+      ? Math.max(0, (hexData.length - 2) / 2)
+      : Math.max(0, hexData.length / 2);
+    const intrinsicGas = BigInt(Math.ceil(21000 + byteCount * 16));
+    const minSafeGas = intrinsicGas + 1_500_000n;
+
+    if (originalEstimate) {
+      try {
+        const estimated = await originalEstimate(params);
+        return estimated > minSafeGas ? estimated : minSafeGas;
+      } catch {
+        return minSafeGas;
+      }
+    }
+    return minSafeGas;
+  };
+
+  return client;
 }
 
 // ─── Transaction lifecycle status ────────────────────────────────────────────

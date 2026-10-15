@@ -26,6 +26,25 @@ async function main() {
     account,
   });
 
+  const originalEstimate = client.estimateTransactionGas?.bind(client);
+  client.estimateTransactionGas = async (params) => {
+    const hexData = params.data || '';
+    const byteCount = hexData.startsWith('0x')
+      ? Math.max(0, (hexData.length - 2) / 2)
+      : Math.max(0, hexData.length / 2);
+    const intrinsicGas = BigInt(Math.ceil(21000 + byteCount * 16));
+    const minSafeGas = intrinsicGas + 1_500_000n;
+    if (originalEstimate) {
+      try {
+        const estimated = await originalEstimate(params);
+        return estimated > minSafeGas ? estimated : minSafeGas;
+      } catch {
+        return minSafeGas;
+      }
+    }
+    return minSafeGas;
+  };
+
   const contractCode = readFileSync('./contracts/zenith_runner.py', 'utf-8');
   console.log('Deploying ZenithRunnerContract to GenLayer Testnet Bradbury (Chain 4221)...');
 
