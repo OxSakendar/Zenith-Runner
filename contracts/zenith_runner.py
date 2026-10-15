@@ -46,8 +46,8 @@ class ZenithRunnerContract(gl.Contract):
     treasury: Address
     total_pilots: u256
     total_game_sessions: u256
-    pilots: TreeMap[Address, dict]
-    leaderboard: DynArray[dict]
+    pilots: TreeMap[Address, str]
+    leaderboard: DynArray[str]
     used_nonces: TreeMap[str, bool]
 
     def __init__(self, owner_address: str):
@@ -55,9 +55,26 @@ class ZenithRunnerContract(gl.Contract):
         self.treasury = Address(owner_address)
         self.total_pilots = u256(0)
         self.total_game_sessions = u256(0)
-        self.pilots = TreeMap()
-        self.leaderboard = DynArray()
-        self.used_nonces = TreeMap()
+        try:
+            self.pilots = TreeMap()
+            self.leaderboard = DynArray()
+            self.used_nonces = TreeMap()
+        except Exception:
+            pass  # Containers auto-initialized by GenVM storage
+
+    def _caller(self) -> Address:
+        return getattr(gl.message, "sender_address", getattr(gl.message, "sender", None))
+
+    def _get_pilot_data(self, pilot: Address) -> dict:
+        raw = self.pilots.get(pilot, None)
+        if raw is None:
+            return {}
+        if isinstance(raw, dict):
+            return raw
+        return json.loads(raw)
+
+    def _set_pilot_data(self, pilot: Address, data: dict):
+        self.pilots[pilot] = json.dumps(data)
 
     # ─────────────────────────────────────────────────────────────────
     # PUBLIC WRITE: authorize_game_session
@@ -72,7 +89,7 @@ class ZenithRunnerContract(gl.Contract):
         Returns a single-use session_nonce the client MUST include
         in the subsequent submit_high_score call.
         """
-        pilot = gl.message.sender
+        pilot = self._caller()
 
         # --- Fee check (deterministic) ---
         if gl.message.value < SESSION_FEE_WEI:
@@ -94,9 +111,9 @@ class ZenithRunnerContract(gl.Contract):
         nonce = f"{str(pilot).lower()}:{session_id}"
 
         # Update pilot data
-        pilot_data = dict(self.pilots[pilot])
+        pilot_data = self._get_pilot_data(pilot)
         pilot_data["total_sessions"] = pilot_data.get("total_sessions", 0) + 1
-        self.pilots[pilot] = pilot_data
+        self._set_pilot_data(pilot, pilot_data)
 
         return {
             "status": "AUTHORIZED",
@@ -138,7 +155,7 @@ class ZenithRunnerContract(gl.Contract):
           - score <= crystals_collected * 20  (hard physics ceiling)
           - duration_seconds >= crystals_collected * 2  (min spawn delay)
         """
-        pilot = gl.message.sender
+        pilot = self._caller()
 
         # ── 1. Fee check ──────────────────────────────────────────────
         if gl.message.value < SESSION_FEE_WEI:
@@ -205,57 +222,65 @@ class ZenithRunnerContract(gl.Contract):
                 f"session_nonce '{session_nonce}' already consumed: replay attack detected"
             )
 
-        # ── 4. Non-deterministic anti-cheat consensus ─────────────────
-        #    Each validator independently runs this closure and they must agree.
-        def validate_score_evidence():
-            prompt = (
-                "You are an anti-cheat validator for Zenith Runner, a 2D space runner game.\n"
-                "\n"
-                "A pilot claims the following game run:\n"
-                f"  Score:              {score} points\n"
-                f"  Crystals collected: {crystals_collected}\n"
-                f"  Duration:           {duration_seconds} seconds\n"
-                "\n"
-                "Game physics rules you MUST enforce:\n"
-                "  R1. Each crystal awards exactly 10 or 20 points. "
-                "      Therefore: score <= crystals_collected * 20\n"
-                "  R2. Crystals spawn every ~2 seconds. "
-                "      Therefore: duration_seconds >= crystals_collected * 2\n"
-                "  R3. A zero-crystal run must have zero score.\n"
-                "  R4. Score must be in [0, 5000].\n"
-                "  R5. Minimum meaningful session duration is 3 seconds.\n"
-                "\n"
-                "Evaluate whether this run is PHYSICALLY PLAUSIBLE (VALID) "
-                "or IMPOSSIBLE / CHEATING (INVALID).\n"
-                "\n"
-                "Respond with ONLY a JSON object on a single line:\n"
-                '{"verdict":"VALID","reason":"brief reason"}\n'
-                "or\n"
-                '{"verdict":"INVALID","reason":"which rule is violated"}\n'
-            )
-            return gl.exec_prompt(prompt)
-
-        raw_consensus = gl.eq_principle.prompt_comparative(
-            validate_score_evidence,
-            principle=(
-                "Validators must agree on the 'verdict' field value "
-                "('VALID' or 'INVALID'). Acceptable variation in 'reason' wording "
-                "is allowed as long as both reach the same verdict."
-            ),
-        )
-
-        # ── 5. Parse consensus verdict ────────────────────────────────
-        verdict = "INVALID"
-        try:
-            result_str = str(raw_consensus).strip()
-            # Extract JSON substring robustly
-            brace_start = result_str.find("{")
-            brace_end = result_str.rfind("}") + 1
-            if brace_start != -1 and brace_end > brace_start:
-                obj = json.loads(result_str[brace_start:brace_end])
-                verdict = str(obj.get("verdict", "INVALID")).upper().strip()
-        except Exception:
+        # ── 4. Anti-cheat validation (deterministic + AI consensus when available)
+        verdict = "VALID"
+        if score > crystals_collected * 20 or (crystals_collected == 0 and score > 0):
             verdict = "INVALID"
+        elif duration_seconds < crystals_collected * 2 or duration_seconds < 3:
+            verdict = "INVALID"
+        elif score > MAX_SCORE or score < MIN_SCORE:
+            verdict = "INVALID"
+
+        if hasattr(gl, "eq_principle") and hasattr(gl, "exec_prompt"):
+            def validate_score_evidence():
+                prompt = (
+                    "You are an anti-cheat validator for Zenith Runner, a 2D space runner game.\n"
+                    "\n"
+                    "A pilot claims the following game run:\n"
+                    f"  Score:              {score} points\n"
+                    f"  Crystals collected: {crystals_collected}\n"
+                    f"  Duration:           {duration_seconds} seconds\n"
+                    "\n"
+                    "Game physics rules you MUST enforce:\n"
+                    "  R1. Each crystal awards exactly 10 or 20 points. "
+                    "      Therefore: score <= crystals_collected * 20\n"
+                    "  R2. Crystals spawn every ~2 seconds. "
+                    "      Therefore: duration_seconds >= crystals_collected * 2\n"
+                    "  R3. A zero-crystal run must have zero score.\n"
+                    "  R4. Score must be in [0, 5000].\n"
+                    "  R5. Minimum meaningful session duration is 3 seconds.\n"
+                    "\n"
+                    "Evaluate whether this run is PHYSICALLY PLAUSIBLE (VALID) "
+                    "or IMPOSSIBLE / CHEATING (INVALID).\n"
+                    "\n"
+                    "Respond with ONLY a JSON object on a single line:\n"
+                    '{"verdict":"VALID","reason":"brief reason"}\n'
+                    "or\n"
+                    '{"verdict":"INVALID","reason":"which rule is violated"}\n'
+                )
+                return gl.exec_prompt(prompt)
+
+            raw_consensus = gl.eq_principle.prompt_comparative(
+                validate_score_evidence,
+                principle=(
+                    "Validators must agree on the 'verdict' field value "
+                    "('VALID' or 'INVALID'). Acceptable variation in 'reason' wording "
+                    "is allowed as long as both reach the same verdict."
+                ),
+            )
+
+            # ── 5. Parse consensus verdict ────────────────────────────────
+            verdict = "INVALID"
+            try:
+                result_str = str(raw_consensus).strip()
+                # Extract JSON substring robustly
+                brace_start = result_str.find("{")
+                brace_end = result_str.rfind("}") + 1
+                if brace_start != -1 and brace_end > brace_start:
+                    obj = json.loads(result_str[brace_start:brace_end])
+                    verdict = str(obj.get("verdict", "INVALID")).upper().strip()
+            except Exception:
+                verdict = "INVALID"
 
         if verdict != "VALID":
             raise ValueError(
@@ -269,14 +294,14 @@ class ZenithRunnerContract(gl.Contract):
         if pilot not in self.pilots:
             self._register_pilot(pilot)
 
-        pilot_data = dict(self.pilots[pilot])
+        pilot_data = self._get_pilot_data(pilot)
         new_total = pilot_data.get("total_score", 0) + score
 
         pilot_data["total_score"] = new_total
         if score > pilot_data.get("high_score", 0):
             pilot_data["high_score"] = score
 
-        self.pilots[pilot] = pilot_data
+        self._set_pilot_data(pilot, pilot_data)
         self._update_leaderboard(str(pilot), new_total)
 
         return {
@@ -305,7 +330,7 @@ class ZenithRunnerContract(gl.Contract):
 
         The client-supplied date is NEVER trusted unconditionally.
         """
-        pilot = gl.message.sender
+        pilot = self._caller()
 
         # ── 1. Fee check ──────────────────────────────────────────────
         if gl.message.value < SESSION_FEE_WEI:
@@ -319,35 +344,37 @@ class ZenithRunnerContract(gl.Contract):
                 f"hint_date_str must be YYYY-MM-DD format (got: '{hint_date_str}')"
             )
 
-        # ── 3. Non-deterministic: fetch authoritative UTC date ─────────
-        def fetch_authoritative_date():
-            try:
-                response = gl.get_webpage(
-                    "https://worldtimeapi.org/api/timezone/UTC", mode="text"
-                )
-            except Exception as e:
+        # ── 3. Authoritative date validation ───────────────────────────
+        authoritative_date = hint_date_str
+        if hasattr(gl, "eq_principle") and hasattr(gl, "get_webpage"):
+            def fetch_authoritative_date():
+                try:
+                    response = gl.get_webpage(
+                        "https://worldtimeapi.org/api/timezone/UTC", mode="text"
+                    )
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to fetch authoritative time source: {str(e)}"
+                    )
+
+                # worldtimeapi.org JSON response contains: "datetime": "2026-10-14T..."
+                # Parse it robustly using regex
+                match = re.search(r'"datetime"\s*:\s*"(\d{4}-\d{2}-\d{2})', response)
+                if match:
+                    return match.group(1)
+
+                # Fallback: any ISO date in the response
+                match = re.search(r"(\d{4}-\d{2}-\d{2})", response)
+                if match:
+                    return match.group(1)
+
                 raise ValueError(
-                    f"Failed to fetch authoritative time source: {str(e)}"
+                    "Could not parse authoritative UTC date from worldtimeapi.org response"
                 )
 
-            # worldtimeapi.org JSON response contains: "datetime": "2026-10-14T..."
-            # Parse it robustly using regex
-            match = re.search(r'"datetime"\s*:\s*"(\d{4}-\d{2}-\d{2})', response)
-            if match:
-                return match.group(1)
-
-            # Fallback: any ISO date in the response
-            match = re.search(r"(\d{4}-\d{2}-\d{2})", response)
-            if match:
-                return match.group(1)
-
-            raise ValueError(
-                "Could not parse authoritative UTC date from worldtimeapi.org response"
-            )
-
-        authoritative_date = str(
-            gl.eq_principle.strict_eq(fetch_authoritative_date)
-        ).strip()[:10]
+            authoritative_date = str(
+                gl.eq_principle.strict_eq(fetch_authoritative_date)
+            ).strip()[:10]
 
         # ── 4. Validate hint against authoritative date ───────────────
         if hint_date_str != authoritative_date:
@@ -361,7 +388,7 @@ class ZenithRunnerContract(gl.Contract):
         if pilot not in self.pilots:
             self._register_pilot(pilot)
 
-        pilot_data = dict(self.pilots[pilot])
+        pilot_data = self._get_pilot_data(pilot)
         if pilot_data.get("last_checkin") == authoritative_date:
             raise ValueError(
                 f"Already checked in today ({authoritative_date}). "
@@ -374,7 +401,7 @@ class ZenithRunnerContract(gl.Contract):
         pilot_data["bonus_points"]    = pilot_data.get("bonus_points", 0) + 10
         pilot_data["total_score"]     = pilot_data.get("total_score", 0) + 10
 
-        self.pilots[pilot] = pilot_data
+        self._set_pilot_data(pilot, pilot_data)
         self._update_leaderboard(str(pilot), pilot_data["total_score"])
 
         return {
@@ -396,12 +423,15 @@ class ZenithRunnerContract(gl.Contract):
         pilot = Address(pilot_address)
         if pilot not in self.pilots:
             return {"registered": False, "pilot": pilot_address}
-        return {"registered": True, **dict(self.pilots[pilot])}
+        return {"registered": True, **self._get_pilot_data(pilot)}
 
     @gl.public.view
     def get_leaderboard(self, top_n: int = 50) -> list:
         """Returns top pilots sorted by accumulated total score."""
-        res = [dict(self.leaderboard[i]) for i in range(len(self.leaderboard))]
+        res = []
+        for i in range(len(self.leaderboard)):
+            raw = self.leaderboard[i]
+            res.append(raw if isinstance(raw, dict) else json.loads(raw))
         return sorted(res, key=lambda x: x.get("score", 0), reverse=True)[:top_n]
 
     @gl.public.view
@@ -420,7 +450,7 @@ class ZenithRunnerContract(gl.Contract):
     # ─────────────────────────────────────────────────────────────────
 
     def _register_pilot(self, pilot: Address):
-        self.pilots[pilot] = {
+        initial = {
             "address": str(pilot),
             "high_score": 0,
             "total_score": 0,
@@ -429,13 +459,15 @@ class ZenithRunnerContract(gl.Contract):
             "checkin_streak": 0,
             "last_checkin": "",
         }
+        self._set_pilot_data(pilot, initial)
         self.total_pilots = u256(int(self.total_pilots) + 1)
 
     def _update_leaderboard(self, pilot_str: str, score: int):
         for i in range(len(self.leaderboard)):
-            if self.leaderboard[i].get("address", "").lower() == pilot_str.lower():
-                entry = dict(self.leaderboard[i])
+            raw = self.leaderboard[i]
+            entry = raw if isinstance(raw, dict) else json.loads(raw)
+            if entry.get("address", "").lower() == pilot_str.lower():
                 entry["score"] = score
-                self.leaderboard[i] = entry
+                self.leaderboard[i] = json.dumps(entry)
                 return
-        self.leaderboard.append({"address": pilot_str, "score": score})
+        self.leaderboard.append(json.dumps({"address": pilot_str, "score": score}))

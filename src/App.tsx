@@ -513,7 +513,7 @@ export default function App() {
     });
   }, [account, isWrongNetwork, runContractWrite, loadAccountData]);
 
-  // 1. Start Game Session (0.00 GEN → authorize_game_session / register_player)
+  // 1. Start Game Session (0.00 GEN → authorize_game_session)
   const handleStartGame = useCallback(() => {
     if (!contractExists) {
       setToast({
@@ -527,33 +527,28 @@ export default function App() {
         account as `0x${string}`,
         window.ethereum,
         onProgress,
-        (_txHash, provisionalNonce) => {
-          // Immediately start game upon wallet approval & broadcast so user is never blocked
-          sessionNonceRef.current = provisionalNonce;
-          crystalsCollectedRef.current = 0;
-          sessionStartRef.current = Math.floor(Date.now() / 1000);
-
-          setScore(0);
-          setShields(100);
-          shipRef.current.x = 400;
-          shipRef.current.shields = 100;
-          crystalsRef.current = [];
-          asteroidsRef.current = [];
-          particlesRef.current = [];
-          setGameState('PLAYING');
-          setToast({ type: 'success', message: 'Session approved & broadcasted! Fly safe, pilot.' });
-        }
       );
-      // Store single-use session nonce for anti-cheat once confirmed on-chain
-      if (result.session_nonce) {
-        sessionNonceRef.current = result.session_nonce;
+      if (!result.session_nonce) {
+        throw new Error('No verified session nonce returned by contract.');
       }
+      // Store verified single-use session nonce for anti-cheat
+      sessionNonceRef.current = result.session_nonce;
+      crystalsCollectedRef.current = 0;
+      sessionStartRef.current = Math.floor(Date.now() / 1000);
+
+      setScore(0);
+      setShields(100);
+      shipRef.current.x = 400;
+      shipRef.current.shields = 100;
+      crystalsRef.current = [];
+      asteroidsRef.current = [];
+      particlesRef.current = [];
       setGameState('PLAYING');
-      setToast({ type: 'success', message: 'Session confirmed on GenLayer Studio!' });
+      setToast({ type: 'success', message: 'Session authorized on-chain! Fly safe, pilot.' });
     });
   }, [runContractWrite, account, contractExists]);
 
-  // 2. Submit High Score (0.01 GEN → submit_high_score with evidence)
+  // 2. Submit High Score (0.00 GEN → submit_high_score with evidence)
   const handleSubmitScore = useCallback(() => {
     const durationSeconds = Math.max(
       3,
@@ -562,6 +557,14 @@ export default function App() {
     const crystalsCollected = crystalsCollectedRef.current;
     const nonce = sessionNonceRef.current;
     const today = new Date().toISOString().split('T')[0];
+
+    if (!nonce) {
+      setToast({
+        type: 'error',
+        message: 'No verified session nonce found. Please start a new session.',
+      });
+      return;
+    }
 
     runContractWrite(async (onProgress) => {
       const result = await executeContractSubmitHighScore(

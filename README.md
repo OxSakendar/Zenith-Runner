@@ -14,7 +14,7 @@
 
 - **GitHub Repository**: [https://github.com/OxSakendar/Zenith-Runner](https://github.com/OxSakendar/Zenith-Runner)
 - **GenLayer Smart Contract Source**: [`contracts/zenith_runner.py`](./contracts/zenith_runner.py)
-- **Active Contract Address**: [`0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE`](https://explorer-studio.genlayer.com/address/0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE)
+- **Active Contract Address**: [`0x1A3F2D4b43012BA12911a469023877f097B4fcd7`](https://explorer-studio.genlayer.com/address/0x1A3F2D4b43012BA12911a469023877f097B4fcd7)
 - **Network Name**: `GenLayer Studio`
 - **Chain ID**: `61999` (`0xf22f`)
 - **RPC URL**: `https://studio.genlayer.com/api`
@@ -186,8 +186,8 @@ npm run dev
 
 ### Active Live Contract
 The contract is live and deployed on **GenLayer Studio**:
-- **Address**: `0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE`
-- **Explorer**: [https://explorer-studio.genlayer.com/address/0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE](https://explorer-studio.genlayer.com/address/0x6F76F389BF3Cb94EF3F9A2EBefDa5EE5A83372DE)
+- **Address**: `0x1A3F2D4b43012BA12911a469023877f097B4fcd7`
+- **Explorer**: [https://explorer-studio.genlayer.com/address/0x1A3F2D4b43012BA12911a469023877f097B4fcd7](https://explorer-studio.genlayer.com/address/0x1A3F2D4b43012BA12911a469023877f097B4fcd7)
 
 ### Option A: In-App 1-Click Deployment (If Deploying a Fresh Contract)
 1. Launch the web app (`npm run dev`) and connect your MetaMask wallet configured for **GenLayer Studio** (Chain ID `61999`, RPC `https://studio.genlayer.com/api`).

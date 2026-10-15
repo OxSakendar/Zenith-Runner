@@ -173,6 +173,21 @@ describe('executeContractAuthorizeSession()', () => {
     expect(steps).toContain('unknown');
     expect(steps).not.toContain('finalized_success');
   });
+
+  it('throws and does NOT fabricate a provisional nonce if receipt and state lack session_nonce', async () => {
+    mockWaitForTransactionReceipt.mockResolvedValue({
+      txExecutionResultName: 'FINISHED_WITH_RETURN',
+      status_name: 'FINALIZED',
+      consensus_data: {
+        leader_receipt: [{ result: JSON.stringify({ status: 'AUTHORIZED' }) }],
+      },
+    });
+    mockReadContract.mockResolvedValue({ registered: false, total_sessions: 0 });
+    const { executeContractAuthorizeSession } = await getService();
+    await expect(
+      executeContractAuthorizeSession(PILOT, PROVIDER, () => {}),
+    ).rejects.toThrow(/Failed to recover authoritative session nonce/);
+  });
 });
 
 describe('executeContractSubmitHighScore()', () => {
@@ -378,6 +393,20 @@ describe('getPilotProfileOnChain()', () => {
     const { getPilotProfileOnChain } = await getService();
     const prof = await getPilotProfileOnChain(PILOT);
     expect(prof).toBeNull();
+  });
+
+  it('does not fallback to ZeroFeeArena get_player_score or get_player_territories on error', async () => {
+    mockReadContract.mockRejectedValue(new Error('method get_pilot_profile not found'));
+    const { getPilotProfileOnChain } = await getService();
+    const prof = await getPilotProfileOnChain(PILOT);
+    expect(prof).toBeNull();
+    expect(mockReadContract).toHaveBeenCalledTimes(1);
+    expect(mockReadContract).not.toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: 'get_player_score' }),
+    );
+    expect(mockReadContract).not.toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: 'get_player_territories' }),
+    );
   });
 });
 
