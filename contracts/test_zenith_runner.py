@@ -61,6 +61,18 @@ class MockGlNamespace:
         def strict_eq(fn):
             return fn()
 
+    class nondet:
+        @staticmethod
+        def exec_prompt(prompt: str, response_format="json"):
+            return MockGlNamespace.exec_prompt(prompt)
+
+        class web:
+            @staticmethod
+            def get(url: str):
+                class MockResponse:
+                    text = MockGlNamespace.get_webpage(url)
+                return MockResponse()
+
     @staticmethod
     def exec_prompt(prompt: str) -> str:
         # Default mock: returns VALID for physically plausible rules

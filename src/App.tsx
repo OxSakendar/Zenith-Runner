@@ -629,41 +629,39 @@ export default function App() {
         onProgress,
       );
 
-      // Update from authoritative on-chain profile
+      // Update strictly from authoritative on-chain profile
       const profile = result.profile;
-      const newBonus = profile?.bonus_points ?? bonusPoints + 10;
+      const newBonus = profile.bonus_points;
       const authDate = result.authoritative_date;
+      const newTotal = profile.total_score;
+      const newHigh = profile.high_score;
       const keyPrefix = `genlayer_game_${account?.toLowerCase()}`;
 
       setBonusPoints(newBonus);
       setLastCheckIn(authDate);
+      setHighScore(newHigh);
       localStorage.setItem(`${keyPrefix}_bonus`, newBonus.toString());
       localStorage.setItem(`${keyPrefix}_checkin`, authDate);
+      localStorage.setItem(`${keyPrefix}_highscore`, newHigh.toString());
 
-      const newTotal = profile?.total_score ?? 0;
-      setHighScore(profile?.high_score ?? highScore);
-      localStorage.setItem(`${keyPrefix}_highscore`, (profile?.high_score ?? highScore).toString());
-
-      if (newTotal > 0) {
-        setLeaderboard(prev => {
-          const existingIdx = prev.findIndex(
-            e => e.address.toLowerCase() === account!.toLowerCase(),
-          );
-          const updated = [...prev];
-          if (existingIdx !== -1) {
-            updated[existingIdx] = { ...updated[existingIdx], score: newTotal, source: 'chain' };
-          } else {
-            updated.push({ address: account!, score: newTotal, date: authDate, source: 'chain' });
-          }
-          updated.sort((a, b) => b.score - a.score);
-          localStorage.setItem('genlayer_leaderboard', JSON.stringify(updated.slice(0, 310)));
-          return updated.slice(0, 310);
-        });
-      }
+      setLeaderboard(prev => {
+        const existingIdx = prev.findIndex(
+          e => e.address.toLowerCase() === account!.toLowerCase(),
+        );
+        const updated = [...prev];
+        if (existingIdx !== -1) {
+          updated[existingIdx] = { ...updated[existingIdx], score: newTotal, source: 'chain' };
+        } else {
+          updated.push({ address: account!, score: newTotal, date: authDate, source: 'chain' });
+        }
+        updated.sort((a, b) => b.score - a.score);
+        localStorage.setItem('genlayer_leaderboard', JSON.stringify(updated.slice(0, 310)));
+        return updated.slice(0, 310);
+      });
 
       setToast({ type: 'success', message: '+10 Bonus Points verified on-chain! Streak updated.' });
     });
-  }, [runContractWrite, account, lastCheckIn, bonusPoints, highScore]);
+  }, [runContractWrite, account, lastCheckIn]);
 
   // Game Loop Logic
   useEffect(() => {

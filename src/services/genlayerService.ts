@@ -22,7 +22,7 @@ import { TransactionStatus, ExecutionResult, type TransactionHash } from 'genlay
 
 // ─── Contract address ────────────────────────────────────────────────────────
 export const DEFAULT_CONTRACT_ADDRESS =
-  '0x1A3F2D4b43012BA12911a469023877f097B4fcd7' as `0x${string}`;
+  '0x2Fd25918dfEF07Cb0aBB8B1395CAb6f4e6eBaC04' as `0x${string}`;
 
 let inMemoryContractAddress: `0x${string}` = DEFAULT_CONTRACT_ADDRESS;
 
@@ -34,7 +34,8 @@ export function getContractAddress(): `0x${string}` {
       saved.startsWith('0x') &&
       saved.length === 42 &&
       !saved.toLowerCase().includes('b441') &&
-      !saved.toLowerCase().includes('6f76')
+      !saved.toLowerCase().includes('6f76') &&
+      !saved.toLowerCase().includes('1a3f')
     ) {
       return saved as `0x${string}`;
     }
@@ -578,8 +579,6 @@ export async function executeContractSubmitHighScore(
 
   const rawReceipt = receipt as Record<string, unknown>;
   const execResult = rawReceipt.txExecutionResultName as string | undefined;
-  const statusName = rawReceipt.status_name as string | undefined;
-  const statusNum = rawReceipt.status as number | undefined;
 
   const consensusData = rawReceipt.consensus_data as Record<string, unknown> | undefined;
   const leaderReceipts = consensusData?.leader_receipt as Array<Record<string, unknown>> | undefined;
@@ -596,26 +595,29 @@ export async function executeContractSubmitHighScore(
     throw new Error(reason);
   }
 
-  const isAcceptedStatus =
-    statusNum === 5 || statusNum === 7 || statusName === 'ACCEPTED' || statusName === 'FINALIZED';
   if (
     execResult !== ExecutionResult.FINISHED_WITH_RETURN &&
-    leaderExecResult !== 'SUCCESS' &&
-    !isAcceptedStatus
+    leaderExecResult !== 'SUCCESS'
   ) {
     const errMsg = `Unexpected execution result: ${execResult ?? leaderExecResult ?? 'NOT_VOTED'}`;
     onProgress(makeTxProgress('unknown', txHash, errMsg));
     throw new Error(errMsg);
   }
 
-  // Read authoritative state from contract to confirm the update
+  // Read authoritative state directly from contract to confirm the update
   const profile = await getPilotProfileOnChain(pilotAddress);
+  if (!profile || !profile.registered) {
+    const errMsg = 'Failed to verify on-chain profile update after score submission.';
+    onProgress(makeTxProgress('finalized_error', txHash, errMsg));
+    throw new Error(errMsg);
+  }
+
   onProgress(makeTxProgress('finalized_success', txHash));
 
   return {
     txHash,
-    total_score: profile?.total_score ?? score,
-    high_score: Math.max(profile?.high_score ?? 0, score),
+    total_score: profile.total_score,
+    high_score: profile.high_score,
     profile,
   };
 }
@@ -625,7 +627,7 @@ export interface CheckInResult {
   txHash: string;
   bonus_points_awarded: number;
   authoritative_date: string;
-  profile: OnChainPilotProfile | null;
+  profile: OnChainPilotProfile;
 }
 
 export async function executeContractDailyCheckIn(
@@ -677,8 +679,6 @@ export async function executeContractDailyCheckIn(
 
   const rawReceipt = receipt as Record<string, unknown>;
   const execResult = rawReceipt.txExecutionResultName as string | undefined;
-  const statusName = rawReceipt.status_name as string | undefined;
-  const statusNum = rawReceipt.status as number | undefined;
 
   const consensusData = rawReceipt.consensus_data as Record<string, unknown> | undefined;
   const leaderReceipts = consensusData?.leader_receipt as Array<Record<string, unknown>> | undefined;
@@ -695,12 +695,9 @@ export async function executeContractDailyCheckIn(
     throw new Error(reason);
   }
 
-  const isAcceptedStatus =
-    statusNum === 5 || statusNum === 7 || statusName === 'ACCEPTED' || statusName === 'FINALIZED';
   if (
     execResult !== ExecutionResult.FINISHED_WITH_RETURN &&
-    leaderExecResult !== 'SUCCESS' &&
-    !isAcceptedStatus
+    leaderExecResult !== 'SUCCESS'
   ) {
     const errMsg = `Unexpected execution result: ${execResult ?? leaderExecResult ?? 'NOT_VOTED'}`;
     onProgress(makeTxProgress('unknown', txHash, errMsg));
@@ -719,6 +716,12 @@ export async function executeContractDailyCheckIn(
   }
 
   const profile = await getPilotProfileOnChain(pilotAddress);
+  if (!profile || profile.last_checkin !== authoritative_date) {
+    const errMsg = 'Failed to verify on-chain daily check-in state update.';
+    onProgress(makeTxProgress('finalized_error', txHash, errMsg));
+    throw new Error(errMsg);
+  }
+
   onProgress(makeTxProgress('finalized_success', txHash));
 
   return {
