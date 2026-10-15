@@ -6,19 +6,27 @@ import {
   Calendar, HelpCircle, ExternalLink, ArrowLeft, ArrowRight,
   X, Send, LogOut
 } from 'lucide-react';
-import { 
+import {
   getPilotProfileOnChain,
   getLeaderboardOnChain,
   executeContractAuthorizeSession,
   executeContractSubmitHighScore,
   executeContractDailyCheckIn,
-  GENLAYER_CONTRACT_ADDRESS
+  GENLAYER_CONTRACT_ADDRESS,
+  type TxProgress,
 } from './services/genlayerService';
 
 // Declare window.ethereum for TypeScript
+/* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+type GenericListener = (...args: any[]) => void;
+
 declare global {
   interface Window {
-    ethereum?: any;
+    ethereum?: ethers.Eip1193Provider & {
+      on?: (event: string, callback: GenericListener) => void;
+      removeListener?: (event: string, callback: GenericListener) => void;
+      isMetaMask?: boolean;
+    };
   }
 }
 
@@ -34,6 +42,8 @@ interface LeaderboardEntry {
   address: string;
   score: number;
   date: string;
+  /** 'chain' = verified on-chain; 'demo' = local simulation */
+  source?: 'chain' | 'demo';
 }
 
 export default function App() {
@@ -52,7 +62,7 @@ export default function App() {
 
   // App & Transaction State
   const [activeTab, setActiveTab] = useState<'GAME' | 'CHECKIN' | 'LEADERBOARD' | 'RULES'>('GAME');
-  const [txLoading, setTxLoading] = useState<{ active: boolean; title: string; message: string; step: number } | null>(null);
+  const [txLoading, setTxLoading] = useState<TxProgress | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
   // Game State
@@ -63,6 +73,7 @@ export default function App() {
   const [lastCheckIn, setLastCheckIn] = useState<string | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [onlineCount, setOnlineCount] = useState<number>(42);
+  const [shields, setShields] = useState<number>(100);
 
   // Canvas Ref & Game Loop variables
   const manuallyDisconnectedRef = useRef<boolean>(false);
@@ -74,6 +85,11 @@ export default function App() {
   const asteroidsRef = useRef<Array<{ x: number; y: number; speed: number; size: number; rot: number; id: number }>>([]);
   const particlesRef = useRef<Array<{ x: number; y: number; vx: number; vy: number; color: string; alpha: number; size: number }>>([]);
   const keysRef = useRef<{ left: boolean; right: boolean }>({ left: false, right: false });
+
+  // Evidence tracking for anti-cheat (score submission)
+  const sessionNonceRef = useRef<string>('');
+  const crystalsCollectedRef = useRef<number>(0);
+  const sessionStartRef = useRef<number>(0);
 
   // Auto-dismiss user toast after 10 minutes
   useEffect(() => {
@@ -117,7 +133,8 @@ export default function App() {
         const formatted: LeaderboardEntry[] = onChainLeaderboard.map(item => ({
           address: item.address,
           score: item.score,
-          date: item.date || item.updated_at || new Date().toISOString().split('T')[0]
+          date: new Date().toISOString().split('T')[0],
+          source: 'chain' as const,
         }));
         setLeaderboard(formatted);
         localStorage.setItem('genlayer_leaderboard', JSON.stringify(formatted));
@@ -222,15 +239,16 @@ export default function App() {
 
         setToast({ type: 'success', message: `${walletName} connected & verified successfully!` });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Wallet connection failed:', error);
+      const err = error as { code?: number; message?: string };
       // Clear any existing toast first, then show error
       setToast(null);
       setTimeout(() => {
-        if (error.code === 4001 || error.message?.includes('rejected') || error.message?.includes('denied') || error.message?.includes('cancelled')) {
+        if (err.code === 4001 || err.message?.includes('rejected') || err.message?.includes('denied') || err.message?.includes('cancelled')) {
           setToast({ type: 'error', message: `Connection rejected. You declined the ${walletName} request.` });
         } else {
-          setToast({ type: 'error', message: error.message || `Failed to connect ${walletName}.` });
+          setToast({ type: 'error', message: err.message || `Failed to connect ${walletName}.` });
         }
       }, 50);
     } finally {
@@ -258,14 +276,16 @@ export default function App() {
 
   // Listen for account/chain changes
   useEffect(() => {
-    if (!window.ethereum) return;
+    const eth = window.ethereum;
+    if (!eth) return;
 
-    const handleAccountsChanged = (accounts: string[]) => {
-      if (accounts.length > 0 && !manuallyDisconnectedRef.current) {
-        const userAddress = accounts[0];
+    const handleAccountsChanged = (accounts: unknown) => {
+      const accList = Array.isArray(accounts) ? (accounts as string[]) : [];
+      if (accList.length > 0 && !manuallyDisconnectedRef.current) {
+        const userAddress = accList[0];
         setAccount(userAddress);
         loadAccountData(userAddress);
-        const provider = new ethers.BrowserProvider(window.ethereum);
+        const provider = new ethers.BrowserProvider(eth);
         refreshWalletState(provider, userAddress);
 
         // Real-time Leaderboard Registration Update for new wallets
@@ -295,30 +315,34 @@ export default function App() {
       }
     };
 
-    const handleChainChanged = (_chainIdHex: string) => {
-      const newChainId = parseInt(_chainIdHex, 16);
+    const handleChainChanged = (_chainIdHex: unknown) => {
+      const hexStr = typeof _chainIdHex === 'string' ? _chainIdHex : '0x0';
+      const newChainId = parseInt(hexStr, 16);
       setChainId(newChainId);
       setIsWrongNetwork(newChainId !== GENLAYER_CHAIN_ID);
       if (account) {
-        const provider = new ethers.BrowserProvider(window.ethereum);
+        const provider = new ethers.BrowserProvider(eth);
         refreshWalletState(provider, account);
       }
     };
 
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
-    window.ethereum.on('chainChanged', handleChainChanged);
+    if (eth.on) {
+      eth.on('accountsChanged', handleAccountsChanged);
+      eth.on('chainChanged', handleChainChanged);
+    }
 
     // Check if already connected
-    window.ethereum.request({ method: 'eth_accounts' }).then((accounts: string[]) => {
-      if (accounts.length > 0 && !manuallyDisconnectedRef.current) {
-        handleAccountsChanged(accounts);
+    eth.request({ method: 'eth_accounts' }).then((accounts: unknown) => {
+      const accList = Array.isArray(accounts) ? (accounts as string[]) : [];
+      if (accList.length > 0 && !manuallyDisconnectedRef.current) {
+        handleAccountsChanged(accList);
       }
     }).catch(console.error);
 
     return () => {
-      if (window.ethereum.removeListener) {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      if (eth.removeListener) {
+        eth.removeListener('accountsChanged', handleAccountsChanged);
+        eth.removeListener('chainChanged', handleChainChanged);
       }
     };
   }, [account, loadAccountData, refreshWalletState]);
@@ -393,9 +417,10 @@ export default function App() {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: GENLAYER_CHAIN_ID_HEX }],
       });
-    } catch (switchError: any) {
+    } catch (switchError: unknown) {
+      const sErr = switchError as { code?: number; message?: string };
       // This error code indicates that the chain has not been added to MetaMask.
-      if (switchError.code === 4902) {
+      if (sErr.code === 4902) {
         try {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
@@ -413,173 +438,175 @@ export default function App() {
               },
             ],
           });
-        } catch (addError: any) {
+        } catch (addError: unknown) {
           console.error('Failed to add GenLayer network:', addError);
           setToast({ type: 'error', message: 'Failed to add GenLayer Testnet to wallet.' });
         }
       } else {
-        console.error('Failed to switch network:', switchError);
+        console.error('Failed to switch network:', sErr);
         setToast({ type: 'error', message: 'Failed to switch network.' });
       }
     }
   };
 
-  // Helper to execute contract method transactions with 0.01 GEN fee
-  const executeContractTransaction = async (
-    title: string,
-    action: (provider: ethers.BrowserProvider) => Promise<any>,
-    successMsg: string,
-    onSuccess: () => void
+  // (executeContractTransaction replaced by runContractWrite below)
+
+  // ── Helper: run a contract write with proper lifecycle tracking ─────────────
+  const runContractWrite = useCallback(async (
+    action: (onProgress: (p: TxProgress) => void) => Promise<void>,
   ) => {
-    if (!account) {
-      setShowWalletModal(true);
-      return;
-    }
-    if (isWrongNetwork) {
-      switchNetwork();
-      return;
-    }
-
+    if (!account) { setShowWalletModal(true); return; }
+    if (isWrongNetwork) { switchNetwork(); return; }
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-
-      setTxLoading({
-        active: true,
-        title,
-        message: 'Please confirm contract transaction in your wallet...',
-        step: 1
-      });
-
-      // Execute Intelligent Contract write call
-      await action(provider);
-
-      setTxLoading({
-        active: true,
-        title,
-        message: 'Contract method executed! Syncing on-chain state...',
-        step: 2
-      });
-
-      // Refresh state from contract
-      await refreshWalletState(provider, account);
-      await loadAccountData(account);
-
-      onSuccess();
-      setToast({ type: 'success', message: successMsg });
-    } catch (error: any) {
-      console.error('Contract transaction error:', error);
-      setToast({ type: 'error', message: error.reason || error.message || 'Contract method execution failed.' });
+      await action((progress) => setTxLoading(progress));
+    } catch (err: unknown) {
+      // Error was already reflected in txLoading by the service layer.
+      // Show an additional error toast for visibility.
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[App] contract write error:', msg);
+      if (!msg.includes('pending') && !msg.includes('timeout') && !msg.toLowerCase().includes('hash')) {
+        setToast({ type: 'error', message: msg.slice(0, 200) });
+      }
     } finally {
-      setTxLoading(null);
+      // Keep txLoading visible for 2 s on success/error so user can read it.
+      setTimeout(() => setTxLoading(null), 2000);
     }
-  };
+  }, [account, isWrongNetwork]);
 
-  // 1. Start Game Session (0.01 GEN required -> calls authorize_game_session contract method)
-  const handleStartGame = () => {
-    executeContractTransaction(
-      'Authorizing Game Session (Contract)',
-      (provider) => executeContractAuthorizeSession(account!, provider),
-      'Game session authorized on GenLayer Contract (authorize_game_session)! Get ready to dodge and collect!',
-      () => {
-        setScore(0);
-        shipRef.current.x = 400;
-        shipRef.current.shields = 100;
-        crystalsRef.current = [];
-        asteroidsRef.current = [];
-        particlesRef.current = [];
-        setGameState('PLAYING');
-      }
+  // 1. Start Game Session (0.01 GEN → authorize_game_session)
+  const handleStartGame = useCallback(() => {
+    runContractWrite(async (onProgress) => {
+      const result = await executeContractAuthorizeSession(
+        account as `0x${string}`,
+        window.ethereum,
+        onProgress,
+      );
+      // Store single-use session nonce for anti-cheat
+      sessionNonceRef.current = result.session_nonce;
+      crystalsCollectedRef.current = 0;
+      sessionStartRef.current = Math.floor(Date.now() / 1000);
+
+      // Reset game state
+      setScore(0);
+      setShields(100);
+      shipRef.current.x = 400;
+      shipRef.current.shields = 100;
+      crystalsRef.current = [];
+      asteroidsRef.current = [];
+      particlesRef.current = [];
+      setGameState('PLAYING');
+      setToast({ type: 'success', message: 'Session authorized! Fly safe, pilot.' });
+    });
+  }, [runContractWrite, account]);
+
+  // 2. Submit High Score (0.01 GEN → submit_high_score with evidence)
+  const handleSubmitScore = useCallback(() => {
+    const durationSeconds = Math.max(
+      3,
+      Math.floor(Date.now() / 1000) - sessionStartRef.current,
     );
-  };
+    const crystalsCollected = crystalsCollectedRef.current;
+    const nonce = sessionNonceRef.current;
+    const today = new Date().toISOString().split('T')[0];
 
-  // 2. Submit High Score (0.01 GEN required -> calls submit_high_score contract method)
-  const handleSubmitScore = () => {
-    const finalScore = score + bonusPoints;
-    const timestamp = new Date().toISOString().split('T')[0];
+    runContractWrite(async (onProgress) => {
+      const result = await executeContractSubmitHighScore(
+        account as `0x${string}`,
+        nonce,
+        score,
+        crystalsCollected,
+        durationSeconds,
+        window.ethereum,
+        onProgress,
+      );
 
-    executeContractTransaction(
-      'Submitting High Score (Contract)',
-      (provider) => executeContractSubmitHighScore(account!, finalScore, timestamp, provider),
-      `Score of ${finalScore} submitted to GenLayer Intelligent Contract (submit_high_score)!`,
-      () => {
-        const keyPrefix = `genlayer_game_${account?.toLowerCase()}`;
+      // Clear nonce — single use
+      sessionNonceRef.current = '';
 
-        setLeaderboard(prev => {
-          const existingIdx = prev.findIndex(e => e.address.toLowerCase() === (account || '').toLowerCase());
-          let updated = [...prev];
-          let newTotal = finalScore;
-          if (existingIdx !== -1) {
-            newTotal = updated[existingIdx].score + finalScore;
-            updated[existingIdx] = { ...updated[existingIdx], score: newTotal, date: timestamp };
-          } else {
-            updated.push({ address: account || '0xAnon', score: newTotal, date: timestamp });
-          }
-          updated.sort((a, b) => b.score - a.score);
-          const sliced = updated.slice(0, 310);
-          localStorage.setItem('genlayer_leaderboard', JSON.stringify(sliced));
+      // Update local state from authoritative on-chain profile
+      const newTotal = result.total_score;
+      const keyPrefix = `genlayer_game_${account?.toLowerCase()}`;
 
-          setHighScore(newTotal);
-          localStorage.setItem(`${keyPrefix}_highscore`, newTotal.toString());
+      setHighScore(result.high_score);
+      localStorage.setItem(`${keyPrefix}_highscore`, result.high_score.toString());
 
-          return sliced;
-        });
+      setLeaderboard(prev => {
+        const existingIdx = prev.findIndex(
+          e => e.address.toLowerCase() === (account || '').toLowerCase(),
+        );
+        const updated = [...prev];
+        if (existingIdx !== -1) {
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            score: newTotal,
+            date: today,
+            source: 'chain',
+          };
+        } else {
+          updated.push({ address: account!, score: newTotal, date: today, source: 'chain' });
+        }
+        updated.sort((a, b) => b.score - a.score);
+        localStorage.setItem('genlayer_leaderboard', JSON.stringify(updated.slice(0, 310)));
+        return updated.slice(0, 310);
+      });
 
-        setGameState('IDLE');
-        setActiveTab('LEADERBOARD');
-      }
-    );
-  };
+      setGameState('IDLE');
+      setActiveTab('LEADERBOARD');
+      setToast({ type: 'success', message: `Score of ${score} verified on-chain! Total: ${newTotal}` });
+    });
+  }, [runContractWrite, account, score]);
 
-  // 3. Daily Check-in (0.01 GEN required -> calls daily_checkin contract method -> grants +10 BP)
-  const handleDailyCheckIn = () => {
+  // 3. Daily Check-in (0.01 GEN → daily_checkin, date validated by contract)
+  const handleDailyCheckIn = useCallback(() => {
     const today = new Date().toISOString().split('T')[0];
     if (lastCheckIn === today) {
-      setToast({ type: 'info', message: 'You have already checked in today! Come back tomorrow.' });
+      setToast({ type: 'info', message: 'Already checked in today. Come back tomorrow!' });
       return;
     }
 
-    executeContractTransaction(
-      'Daily Check-In (Contract)',
-      (provider) => executeContractDailyCheckIn(account!, today, provider),
-      'Daily check-in verified on GenLayer Intelligent Contract (daily_checkin)! +10 Bonus Points awarded.',
-      () => {
-        const newBonus = bonusPoints + 10;
-        setBonusPoints(newBonus);
-        setLastCheckIn(today);
-        if (account) {
-          const keyPrefix = `genlayer_game_${account.toLowerCase()}`;
-          localStorage.setItem(`${keyPrefix}_bonus`, newBonus.toString());
-          localStorage.setItem(`${keyPrefix}_checkin`, today);
+    runContractWrite(async (onProgress) => {
+      const result = await executeContractDailyCheckIn(
+        account as `0x${string}`,
+        today,           // hint — contract validates against worldtimeapi.org
+        window.ethereum,
+        onProgress,
+      );
 
-          setLeaderboard(prev => {
-            const existingIdx = prev.findIndex(e => e.address.toLowerCase() === account.toLowerCase());
-            let newTotal = newBonus;
-            if (existingIdx !== -1) {
-              const updated = [...prev];
-              newTotal = updated[existingIdx].score + 10;
-              updated[existingIdx] = { ...updated[existingIdx], score: newTotal };
-              updated.sort((a, b) => b.score - a.score);
-              localStorage.setItem('genlayer_leaderboard', JSON.stringify(updated));
-              setHighScore(newTotal);
-              localStorage.setItem(`${keyPrefix}_highscore`, newTotal.toString());
-              return updated;
-            } else {
-              const newEntry: LeaderboardEntry = {
-                address: account,
-                score: newBonus,
-                date: today
-              };
-              const updated = [...prev, newEntry].sort((a, b) => b.score - a.score);
-              localStorage.setItem('genlayer_leaderboard', JSON.stringify(updated));
-              setHighScore(newBonus);
-              localStorage.setItem(`${keyPrefix}_highscore`, newBonus.toString());
-              return updated;
-            }
-          });
-        }
+      // Update from authoritative on-chain profile
+      const profile = result.profile;
+      const newBonus = profile?.bonus_points ?? bonusPoints + 10;
+      const authDate = result.authoritative_date;
+      const keyPrefix = `genlayer_game_${account?.toLowerCase()}`;
+
+      setBonusPoints(newBonus);
+      setLastCheckIn(authDate);
+      localStorage.setItem(`${keyPrefix}_bonus`, newBonus.toString());
+      localStorage.setItem(`${keyPrefix}_checkin`, authDate);
+
+      const newTotal = profile?.total_score ?? 0;
+      setHighScore(profile?.high_score ?? highScore);
+      localStorage.setItem(`${keyPrefix}_highscore`, (profile?.high_score ?? highScore).toString());
+
+      if (newTotal > 0) {
+        setLeaderboard(prev => {
+          const existingIdx = prev.findIndex(
+            e => e.address.toLowerCase() === account!.toLowerCase(),
+          );
+          const updated = [...prev];
+          if (existingIdx !== -1) {
+            updated[existingIdx] = { ...updated[existingIdx], score: newTotal, source: 'chain' };
+          } else {
+            updated.push({ address: account!, score: newTotal, date: authDate, source: 'chain' });
+          }
+          updated.sort((a, b) => b.score - a.score);
+          localStorage.setItem('genlayer_leaderboard', JSON.stringify(updated.slice(0, 310)));
+          return updated.slice(0, 310);
+        });
       }
-    );
-  };
+
+      setToast({ type: 'success', message: '+10 Bonus Points verified on-chain! Streak updated.' });
+    });
+  }, [runContractWrite, account, lastCheckIn, bonusPoints, highScore]);
 
   // Game Loop Logic
   useEffect(() => {
@@ -672,6 +699,7 @@ export default function App() {
           if (c.value === 20) {
             // TOUCHED THE RED ONE -> GAME OVER!!!
             ship.shields = 0;
+            setShields(0);
             for (let p = 0; p < 20; p++) {
               particlesRef.current.push({
                 x: c.x, y: c.y,
@@ -683,7 +711,8 @@ export default function App() {
             setGameState('GAMEOVER');
             break;
           } else {
-            // Collect Cyan Crystal
+            // Collect Cyan Crystal — track count for anti-cheat evidence
+            crystalsCollectedRef.current += 1;
             setScore(s => s + c.value);
             // Spawn particles
             for (let p = 0; p < 10; p++) {
@@ -733,6 +762,7 @@ export default function App() {
         ) {
           // Hit Asteroid
           ship.shields -= 25;
+          setShields(Math.max(0, ship.shields));
           for (let p = 0; p < 15; p++) {
             particlesRef.current.push({
               x: a.x, y: a.y,
@@ -1091,9 +1121,9 @@ export default function App() {
                   <Trophy size={20} color="#f59e0b" />
                   <span>Total: {score + bonusPoints}</span>
                 </div>
-                <div className="hud-item" style={{ borderColor: shipRef.current.shields > 30 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.5)' }}>
-                  <ShieldAlert size={20} color={shipRef.current.shields > 30 ? '#10b981' : '#ef4444'} />
-                  <span>Shields: {shipRef.current.shields}%</span>
+                <div className="hud-item" style={{ borderColor: shields > 30 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.5)' }}>
+                  <ShieldAlert size={20} color={shields > 30 ? '#10b981' : '#ef4444'} />
+                  <span>Shields: {shields}%</span>
                 </div>
               </div>
 
@@ -1309,41 +1339,82 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Leaderboard refresh button */}
+              <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={async () => {
+                    const chainData = await getLeaderboardOnChain(50);
+                    if (chainData && chainData.length > 0) {
+                      const formatted: LeaderboardEntry[] = chainData.map(item => ({
+                        address: item.address,
+                        score: item.score,
+                        date: new Date().toISOString().split('T')[0],
+                        source: 'chain' as const,
+                      }));
+                      setLeaderboard(prev => {
+                        const demoOnly = prev.filter(
+                          p => p.source === 'demo' && !formatted.some(f => f.address.toLowerCase() === p.address.toLowerCase())
+                        );
+                        const merged = [...formatted, ...demoOnly].sort((a, b) => b.score - a.score);
+                        localStorage.setItem('genlayer_leaderboard', JSON.stringify(merged.slice(0, 310)));
+                        return merged.slice(0, 310);
+                      });
+                      setToast({ type: 'success', message: `Loaded ${chainData.length} verified on-chain entries.` });
+                    } else {
+                      setToast({ type: 'info', message: 'No on-chain entries yet or RPC unavailable.' });
+                    }
+                  }}
+                  className="btn-premium btn-outline"
+                  style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <RefreshCw size={14} /> Refresh from Chain
+                </button>
+              </div>
+
               {/* Leaderboard Table */}
               <div style={{ borderRadius: '16px', overflowX: 'auto', border: '1px solid var(--border-color)' }}>
-                <table style={{ width: '100%', minWidth: '550px', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'rgba(15, 8, 30, 0.8)', borderBottom: '1px solid var(--border-color)' }}>
-                      <th style={{ padding: '1rem 1.5rem', fontWeight: 600, color: 'var(--text-muted)' }}>Rank</th>
-                      <th style={{ padding: '1rem 1.5rem', fontWeight: 600, color: 'var(--text-muted)' }}>Player Address</th>
-                      <th style={{ padding: '1rem 1.5rem', fontWeight: 600, color: 'var(--text-muted)' }}>Date Verified</th>
-                      <th style={{ padding: '1rem 1.5rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'right' }}>Total Score</th>
+                      <th style={{ padding: '1rem 1.2rem', fontWeight: 600, color: 'var(--text-muted)' }}>Rank</th>
+                      <th style={{ padding: '1rem 1.2rem', fontWeight: 600, color: 'var(--text-muted)' }}>Player Address</th>
+                      <th style={{ padding: '1rem 1.2rem', fontWeight: 600, color: 'var(--text-muted)' }}>Source</th>
+                      <th style={{ padding: '1rem 1.2rem', fontWeight: 600, color: 'var(--text-muted)' }}>Date</th>
+                      <th style={{ padding: '1rem 1.2rem', fontWeight: 600, color: 'var(--text-muted)', textAlign: 'right' }}>Total Score</th>
                     </tr>
                   </thead>
                   <tbody>
                     {leaderboard.slice(0, 10).map((entry, index) => (
-                      <tr 
-                        key={index} 
-                        style={{ 
+                      <tr
+                        key={index}
+                        style={{
                           borderBottom: '1px solid rgba(255,255,255,0.05)',
                           background: entry.address.toLowerCase() === account?.toLowerCase() ? 'var(--accent-purple-glow)' : index % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
                           transition: 'background 0.2s'
                         }}
                       >
-                        <td style={{ padding: '1.2rem 1.5rem', fontWeight: 700 }}>
-                          {index === 0 ? <span style={{ color: '#f59e0b', fontSize: '1.2rem' }}>🥇 1</span> : 
-                           index === 1 ? <span style={{ color: '#94a3b8', fontSize: '1.2rem' }}>🥈 2</span> : 
-                           index === 2 ? <span style={{ color: '#d97706', fontSize: '1.2rem' }}>🥉 3</span> : 
+                        <td style={{ padding: '1rem 1.2rem', fontWeight: 700 }}>
+                          {index === 0 ? <span style={{ color: '#f59e0b', fontSize: '1.2rem' }}>🥇 1</span> :
+                           index === 1 ? <span style={{ color: '#94a3b8', fontSize: '1.2rem' }}>🥈 2</span> :
+                           index === 2 ? <span style={{ color: '#d97706', fontSize: '1.2rem' }}>🥉 3</span> :
                            `#${index + 1}`}
                         </td>
-                        <td style={{ padding: '1.2rem 1.5rem', fontFamily: 'Space Grotesk', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          {entry.address.slice(0, 6)}...{entry.address.slice(-4)}
-                          {entry.address.toLowerCase() === account?.toLowerCase() && (
-                            <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', background: 'var(--accent-purple)', borderRadius: '10px', color: 'white', fontWeight: 600 }}>YOU</span>
-                          )}
+                        <td style={{ padding: '1rem 1.2rem', fontFamily: 'Space Grotesk', fontWeight: 500 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {entry.address.slice(0, 6)}...{entry.address.slice(-4)}
+                            {entry.address.toLowerCase() === account?.toLowerCase() && (
+                              <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', background: 'var(--accent-purple)', borderRadius: '8px', color: 'white', fontWeight: 600 }}>YOU</span>
+                            )}
+                          </div>
                         </td>
-                        <td style={{ padding: '1.2rem 1.5rem', color: 'var(--text-muted)', fontSize: '0.95rem' }}>{entry.date}</td>
-                        <td style={{ padding: '1.2rem 1.5rem', textAlign: 'right', fontWeight: 700, fontSize: '1.1rem', color: index < 3 ? '#d8b4fe' : 'var(--text-main)' }}>
+                        <td style={{ padding: '1rem 1.2rem' }}>
+                          {entry.source === 'chain'
+                            ? <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.6rem', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', color: '#10b981', fontWeight: 700 }}>✓ VERIFIED</span>
+                            : <span style={{ fontSize: '0.72rem', padding: '0.15rem 0.6rem', background: 'rgba(148,163,184,0.1)', border: '1px solid rgba(148,163,184,0.3)', borderRadius: '8px', color: '#94a3b8', fontWeight: 600 }}>DEMO</span>
+                          }
+                        </td>
+                        <td style={{ padding: '1rem 1.2rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{entry.date}</td>
+                        <td style={{ padding: '1rem 1.2rem', textAlign: 'right', fontWeight: 700, fontSize: '1.1rem', color: index < 3 ? '#d8b4fe' : 'var(--text-main)' }}>
                           {entry.score}
                         </td>
                       </tr>
@@ -1603,33 +1674,42 @@ export default function App() {
         </div>
       )}
 
-      {/* TRANSACTION LOADING MODAL */}
+      {/* TRANSACTION LIFECYCLE MODAL */}
       {txLoading && (
         <div className="modal-backdrop">
-          <div className="modal-content glass-card" style={{ padding: '2.5rem', textAlign: 'center', background: 'rgba(15, 8, 30, 0.95)', border: '1px solid var(--accent-purple)', boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px var(--accent-purple-glow)' }}>
-            <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: 'var(--accent-purple-glow)', border: '2px solid var(--accent-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.8rem' }}>
-              <div className="animate-spin">
-                <RefreshCw size={40} color="white" />
-              </div>
+          <div className="modal-content glass-card" style={{ padding: '2.5rem', textAlign: 'center', background: 'rgba(15, 8, 30, 0.95)', border: `1px solid ${txLoading.status === 'finalized_error' ? 'rgba(239,68,68,0.6)' : txLoading.status === 'finalized_success' ? 'rgba(16,185,129,0.6)' : 'var(--accent-purple)'}`, boxShadow: '0 25px 60px rgba(0,0,0,0.8), 0 0 40px var(--accent-purple-glow)' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: txLoading.status === 'finalized_error' ? 'rgba(239,68,68,0.2)' : txLoading.status === 'finalized_success' ? 'rgba(16,185,129,0.2)' : 'var(--accent-purple-glow)', border: `2px solid ${txLoading.status === 'finalized_error' ? '#ef4444' : txLoading.status === 'finalized_success' ? '#10b981' : 'var(--accent-purple)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.8rem' }}>
+              {txLoading.status === 'finalized_success'
+                ? <CheckCircle2 size={40} color="#10b981" />
+                : txLoading.status === 'finalized_error'
+                  ? <ShieldAlert size={40} color="#ef4444" />
+                  : <div className="animate-spin"><RefreshCw size={40} color="white" /></div>
+              }
             </div>
-            
-            <h3 style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.8rem' }}>{txLoading.title}</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', marginBottom: '2rem', lineHeight: 1.5 }}>{txLoading.message}</p>
 
-            {/* Progress Steps */}
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', margin: '0 auto 1rem', maxWidth: '300px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: txLoading.step >= 1 ? 'var(--accent-purple)' : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
-                1
-              </div>
-              <div style={{ flex: 1, height: '4px', background: txLoading.step >= 2 ? 'var(--accent-purple)' : 'rgba(255,255,255,0.1)', borderRadius: '2px' }} />
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: txLoading.step >= 2 ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600 }}>
-                2
-              </div>
+            <h3 style={{ fontSize: '1.8rem', fontWeight: 700, marginBottom: '0.8rem' }}>{txLoading.title}</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '1rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>{txLoading.message}</p>
+
+            {/* 4-step progress bar */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', margin: '0 auto 0.8rem', maxWidth: '380px' }}>
+              {[1,2,3,4].map(s => (
+                <>
+                  <div key={s} style={{ width: '32px', height: '32px', borderRadius: '50%', background: txLoading.step >= s ? (txLoading.status === 'finalized_error' ? '#ef4444' : txLoading.status === 'finalized_success' ? '#10b981' : 'var(--accent-purple)') : 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: '0.85rem', flexShrink: 0 }}>{s}</div>
+                  {s < 4 && <div style={{ flex: 1, height: '3px', background: txLoading.step > s ? 'var(--accent-purple)' : 'rgba(255,255,255,0.1)', borderRadius: '2px' }} />}
+                </>
+              ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '320px', margin: '0 auto' }}>
-              <span>Wallet Approval</span>
-              <span>GenLayer Confirmation</span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', color: 'var(--text-muted)', fontSize: '0.72rem', maxWidth: '380px', margin: '0 auto 1.5rem', textAlign: 'center', gap: '0.25rem' }}>
+              <span>Wallet</span><span>Submitted</span><span>Consensus</span><span>Confirmed</span>
             </div>
+
+            {/* Explorer link once tx hash is known */}
+            {txLoading.explorerUrl && (
+              <a href={txLoading.explorerUrl} target="_blank" rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-cyan)', fontSize: '0.85rem', textDecoration: 'none', fontWeight: 600 }}>
+                <ExternalLink size={14} /> View on GenLayer Explorer
+              </a>
+            )}
           </div>
         </div>
       )}

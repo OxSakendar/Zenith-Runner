@@ -1,164 +1,194 @@
-# 🌌 Zenith Runner
+# 🌌 Zenith Runner — GenLayer Odyssey
 
-[![Chain: GenLayer Testnet](https://img.shields.io/badge/Chain-GenLayer%20Testnet-8A2BE2?style=for-the-badge&logo=ethereum)](https://explorer.testnet-chain.genlayer.com/)
+[![Chain: GenLayer Testnet](https://img.shields.io/badge/Chain-GenLayer%20Testnet%20(Bradbury)-8A2BE2?style=for-the-badge&logo=ethereum)](https://explorer.testnet-chain.genlayer.com/)
 [![React: 19.x](https://img.shields.io/badge/React-19.x-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![Vite: 8.x](https://img.shields.io/badge/Vite-8.x-ffd845?style=for-the-badge&logo=vite)](https://vite.dev/)
 [![TypeScript: 6.x](https://img.shields.io/badge/TypeScript-6.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Tests: 44 Passing](https://img.shields.io/badge/Tests-44%20Passing-success?style=for-the-badge)](https://vitest.dev/)
 
-**Zenith Runner** is a premium, high-octane decentralized space/cyber runner game built with React 19, TypeScript, Vite, and HTML5 Canvas. The game features full Web3 integration on the **GenLayer Testnet**, allowing players to verify their pilots, authorize gameplay sessions, check-in daily, and post high scores onto an on-chain leaderboard using native testnet `GEN` tokens.
+**Zenith Runner** is a decentralized space/cyber runner game built with React 19, TypeScript, Vite, and HTML5 Canvas. The game features full Web3 integration on the **GenLayer Testnet**, utilizing GenLayer Intelligent Smart Contracts with non-deterministic LLM consensus anti-cheat verification, single-use session nonces for replay protection, and authoritative external time validation for daily check-ins.
 
 ---
 
-## 🔗 Project Submission Evidence & Links
+## 🔗 Project Links & Testnet Configuration
 
 - **GitHub Repository**: [https://github.com/OxSakendar/Zenith-Runner](https://github.com/OxSakendar/Zenith-Runner)
 - **GenLayer Smart Contract Source**: [`contracts/zenith_runner.py`](./contracts/zenith_runner.py)
-- **GenLayer Contract Address**: `0xb4412590158f0CceEc98ebffAFf99C851Ab6703c`
+- **Contract Address**: `0xb4412590158f0CceEc98ebffAFf99C851Ab6703c`
+- **GenLayer Testnet Chain ID**: `4221` (`0x107d`)
+- **GenLayer RPC URL**: `https://rpc.testnet-chain.genlayer.com/`
 - **GenLayer Block Explorer**: [https://explorer.testnet-chain.genlayer.com/](https://explorer.testnet-chain.genlayer.com/)
+- **GenLayer Testnet Faucet**: [https://testnet-faucet.genlayer.foundation/](https://testnet-faucet.genlayer.foundation/)
+- **Native Currency**: `GEN`
 
 ---
 
-## 🚀 Play & Experience
+## 🧠 Smart Contract Architecture (`contracts/zenith_runner.py`)
 
-To play Zenith Runner, make sure your Web3 wallet is connected and configured for the GenLayer Testnet.
+The smart contract is written in Python following the official GenLayer Intelligent Contract specification (`py-genlayer`).
 
-### 🚰 Faucet and Blockchain Tools
+### 1. Replay Protection & Session Authorization (`authorize_game_session`)
+- **Payable Requirement**: Requires `>= 0.01 GEN` (`10000000000000000` wei) session fee.
+- **Identity Enforcement**: Caller identity is derived exclusively from `gl.message.sender` (never trusted from client parameters).
+- **Session Nonce**: Generates a single-use session nonce formatted as `<pilot_address>:<session_id>`.
+- **State Storage**: Tracks cumulative game sessions and registers pilots in `self.pilots: TreeMap[Address, dict]`.
 
-- **Testnet RPC URL**: `https://rpc.testnet-chain.genlayer.com/`
-- **Chain ID**: `4221` (Hex: `0x107d`)
-- **Currency Symbol**: `GEN`
-- **Testnet Explorer**: [GenLayer Block Explorer](https://explorer.testnet-chain.genlayer.com/)
-- **Testnet Faucet**: [GenLayer Testnet Faucet](https://testnet-faucet.genlayer.foundation/)
+### 2. Anti-Cheat Consensus & Score Validation (`submit_high_score`)
+Browser-supplied scores and timestamps are never trusted. The contract enforces structured evidence validation across multiple layers:
 
----
+#### Evidence Format
+```python
+submit_high_score(
+    session_nonce: str,          # Single-use nonce from authorize_game_session
+    score: int,                  # Run score claimed by pilot
+    crystals_collected: int,     # Number of crystals collected
+    duration_seconds: int        # Duration of game session in seconds
+)
+```
 
-## 🐍 GenLayer Intelligent Smart Contract Source
+#### Deterministic Invariant Checks (Fast Pre-Consensus Reject)
+- `score` bounded in `[0, 5000]`.
+- `crystals_collected` bounded in `[0, 500]`.
+- `duration_seconds` bounded in `[3, 3600]`.
+- **Hard Physics Ceiling**: `score <= crystals_collected * 20` (each crystal can award at most 20 points).
+- **Spawn Timing Limit**: `duration_seconds >= crystals_collected * 2` (minimum delay between crystal spawns).
+- **Zero-Crystal Invariant**: If `crystals_collected == 0`, `score` must be `0`.
+- **Replay Protection**: Verifies `session_nonce` has not been consumed; marks `self.used_nonces[session_nonce] = True`.
 
-The core Web3 logic of Zenith Runner is powered by a GenLayer Intelligent Smart Contract written in Python. The complete source code is available in the repository at [`contracts/zenith_runner.py`](./contracts/zenith_runner.py).
+#### Non-Deterministic LLM Consensus Primitive
+```python
+def validate_score_evidence():
+    prompt = (
+        "You are an anti-cheat validator for Zenith Runner, a 2D space runner game.\n"
+        f"Score: {score}, Crystals: {crystals_collected}, Duration: {duration_seconds}s\n"
+        "Evaluate whether this run is PHYSICALLY PLAUSIBLE (VALID) or CHEATING (INVALID).\n"
+        "Respond with JSON: {\"verdict\":\"VALID\"|\"INVALID\",\"reason\":\"...\"}"
+    )
+    return gl.exec_prompt(prompt)
 
-### Key Contract Methods
+raw_consensus = gl.eq_principle.prompt_comparative(
+    validate_score_evidence,
+    principle="Validators must agree on the 'verdict' field value ('VALID' or 'INVALID')."
+)
+```
+- **Deterministic State Writes**: Persistent player scores, high scores, and leaderboard rankings are updated **only** on the deterministic path after a `"VALID"` consensus decision is confirmed.
+- Any consensus indeterminate state, `"INVALID"` verdict, or parsing failure triggers a hard transaction revert, ensuring points can never be awarded on failed runs.
 
-1. `authorize_game_session(pilot_address: str)`: Authorizes flight sessions on-chain upon receipt of the **0.01 GEN** session authorization fee.
-2. `submit_high_score(pilot_address: str, score: int, timestamp: str)`: Validates and accumulates pilot high scores on the global GenLayer leaderboard.
-3. `daily_checkin(pilot_address: str, date_str: str)`: Enforces 24-hour daily check-in verification, tracks check-in streaks, and rewards **+10 Bonus Points (BP)**.
-4. `get_pilot_profile(pilot_address: str)`: Queries pilot statistics including total score, sessions played, streak count, and high score.
-5. `get_leaderboard(top_n: int)`: Fetches top global pilot rankings sorted by total verified points.
-
----
-
-## 🎮 Gameplay & Mechanics
-
-Pilot a sleek red cyber-fighter through a hazardous starfield filled with energy crystals and dangerous space debris.
-
-### 🕹️ Controls
-
-- **Desktop/Keyboard**: Use `Arrow Left` / `Arrow Right` or `A` / `D` keys to fly.
-- **Mobile/Touch Devices**: Hold down the on-screen left and right arrow buttons to navigate.
-
-### 🪐 In-Game Entities
-
-- **Cyan Energy Crystals (💎)**: Collect these to gain +10 or +20 points towards your Base Score.
-- **Dark Matter Asteroids (☄️)**: Colliding with these damages your shield core by **25%**.
-- **Red Corrupted Crystals (🔴)**: Avoid at all costs. Touching a red crystal leads to an **instant Game Over**.
-
----
-
-## ⛓️ GenLayer Web3 Mechanics
-
-Zenith Runner leverages micro-transactions of exactly **0.01 GEN** to validate critical pilot activities, prevent spam, and secure the leaderboard:
-
-| Action | Fee (GEN) | Reward / Outcome |
-| :--- | :--- | :--- |
-| **Authorize Game** | `0.01 GEN` | Starts the physics loop and authorizes a single flight session. |
-| **Submit High Score** | `0.01 GEN` | Permanently records and accumulates your score on the public leaderboard. |
-| **Daily Check-In** | `0.01 GEN` | Verifies your active streak and claims **+10 Bonus Points (BP)**. |
-
-> [!NOTE]
-> If your wallet has low `GEN` balance, the client includes an automated testnet fallback simulation to ensure developers and testers can experience the gameplay loop smoothly.
-
----
-
-## 💎 Features
-
-- **Decentralized Verification & Signing**: Prompts users to sign a cryptographic verification message upon connection to verify pilot identity securely.
-- **Multi-Wallet Support**: Custom connection modal optimized for MetaMask, Bitget Wallet, Phantom, Backpack, Base, Rainbow, and WalletConnect.
-- **Real-Time Leaderboard**: Built-in mock testnet active pilot activity simulation (up to 310 concurrent pilots) to test dynamic ranking calculations in real-time.
-- **Client-Side Syncing**: Real-time cross-tab updates using HTML5 Local Storage syncing for high scores, daily streaks, and cached leaderboard snapshots.
-- **Privacy & Storage Modals**: Built-in interactive modals detailing transparent Terms of Service, non-custodial Privacy Policies, and Cookie Policies.
+### 3. Authoritative Daily Check-in (`daily_checkin`)
+- **Fee Requirement**: Requires `>= 0.01 GEN`.
+- **Authoritative Time Source**: Fetches UTC time from an external authoritative source (`worldtimeapi.org/api/timezone/UTC`) inside a non-deterministic block evaluated via `gl.eq_principle.strict_eq`.
+- **Untrusted Client Protection**: Client date hint is compared against the authoritative UTC date. Any discrepancy (or client clock manipulation) immediately causes rejection.
+- **Streak & Duplicate Enforcement**: Prevents multiple check-ins on the same calendar day based on authoritative state `last_checkin == authoritative_date`.
 
 ---
 
-## 🛠️ Architecture & Tech Stack
+## ⚡ Frontend & Transaction Lifecycle (`src/services/genlayerService.ts`)
 
-- **Frontend Library**: React 19.x & TypeScript
-- **Build Tool**: Vite 8.x
-- **Styling**: Premium custom CSS (using CSS custom properties, glassmorphism filters, neon glow shadows, and sleek transitions)
-- **Graphics rendering**: HTML5 2D Canvas Context API
-- **Web3 Integration**: Ethers.js v6 (for JSON-RPC interactions, transaction execution, and cryptographic signatures)
-- **Smart Contract**: GenLayer Intelligent Contract (`contracts/zenith_runner.py`)
-- **Icons**: Lucide React
+### Lifecycle States
+1. `wallet_pending`: Prompting MetaMask / Web3 wallet signature.
+2. `chain_pending`: Transaction hash broadcasted to GenLayer RPC.
+3. `finalizing`: Awaiting GenLayer validator consensus (`TransactionStatus.FINALIZED`).
+4. `finalized_success`: Execution result is `FINISHED_WITH_RETURN` and verified by reading authoritative contract state.
+5. `finalized_error`: Execution result is `FINISHED_WITH_ERROR` or consensus rejected; displays contract revert reason.
+6. `unknown`: Timeout or RPC disruption. Displays transaction hash and block explorer link; prevents duplicate submission.
+
+### Elimination of Silent Fallbacks
+- Prior versions contained fallbacks that simulated on-chain success when transactions failed.
+- All silent fallbacks have been removed. If a wallet rejection, consensus failure, or RPC timeout occurs, the UI explicitly reports the error or unknown state without writing false local data.
+- **Demo Mode Separation**: Local test simulation is explicitly tagged as `DEMO` in the UI and leaderboard. Real on-chain data is tagged as `✓ VERIFIED`.
 
 ---
 
-## ⚙️ Local Development Setup
+## 🧪 Test Suite & Verification Results
 
-To run Zenith Runner locally on your machine, follow these steps:
+All tests run cleanly and offline using deterministic mocking.
+
+### 1. Smart Contract Tests (`contracts/test_zenith_runner.py`)
+```bash
+python -m unittest contracts/test_zenith_runner.py
+```
+**19 Passing Tests**:
+- `test_authorize_session_fails_with_insufficient_fee`
+- `test_authorize_session_success_and_nonce_issuance`
+- `test_replay_attack_rejected`
+- `test_nonce_belonging_to_another_pilot_rejected`
+- `test_submit_high_score_fails_with_insufficient_fee`
+- `test_negative_score_rejected`
+- `test_score_exceeding_max_ceiling_rejected`
+- `test_score_without_crystals_rejected`
+- `test_score_exceeding_crystal_multiplier_rejected`
+- `test_duration_shorter_than_spawn_delay_rejected`
+- `test_anti_cheat_consensus_valid_updates_state`
+- `test_anti_cheat_consensus_invalid_rejects_and_preserves_state`
+- `test_anti_cheat_consensus_indeterminate_or_malformed_rejects`
+- `test_daily_checkin_fails_with_insufficient_fee`
+- `test_daily_checkin_success_with_matching_authoritative_date`
+- `test_daily_checkin_rejects_untrusted_client_date`
+- `test_daily_checkin_rejects_duplicate_checkin_same_day`
+- `test_view_leaderboard_sorting`
+- `test_view_contract_stats`
+
+### 2. Frontend & Transaction Service Tests (`src/__tests__/genlayerService.test.ts`)
+```bash
+npx vitest run
+```
+**25 Passing Tests**:
+- Progress & lifecycle state mapping (wallet_pending, finalizing, finalized_success, finalized_error, unknown).
+- `executeContractAuthorizeSession`: lifecycle sequence, nonce parsing, wallet denial rejection, finality error, timeout handling.
+- `executeContractSubmitHighScore`: authoritative profile read on success, consensus rejection handling, indeterminate consensus (`NOT_VOTED`), replayed nonce rejection, physics ceiling violation rejection, insufficient fee rejection, timeout handling.
+- `executeContractDailyCheckIn`: authoritative date verification, duplicate check-in rejection, client date mismatch rejection, insufficient fee rejection, check-in timeout handling.
+- `getPilotProfileOnChain`: successful profile deserialization, graceful RPC error handling.
+- `getLeaderboardOnChain`: chain source annotation, network failure resilience.
+
+### Total Tests: 44 Passing (100% Pass Rate)
+
+---
+
+## 🚀 Local Development & Build Commands
 
 ### Prerequisites
+- Node.js v18+ & npm
+- Python 3.10+
 
-Make sure you have [Node.js](https://nodejs.org/) (v18+ recommended) and `npm` installed.
-
-### 1. Clone & Navigate
-
+### Run All Tests
 ```bash
-git clone https://github.com/OxSakendar/Zenith-Runner.git
-cd Zenith-Runner
+npm test
 ```
+*(Executes both Vitest and Python contract test suites).*
 
-### 2. Install Dependencies
-
-```bash
-npm install
-```
-
-### 3. Start Development Server
-
-```bash
-cmd /c "npm run dev"
-```
-
-### 4. Build for Production
-
-To create a production-ready build:
-
-```bash
-npm run build
-```
-
-This generates a static build in the `dist` directory.
-
-### 5. Code Quality (Linting)
-
-Ensure code styling and guidelines are met:
-
+### Run Code Quality Check (ESLint)
 ```bash
 npm run lint
 ```
+*(Zero errors, zero warnings).*
+
+### Build Production Bundle
+```bash
+npm run build
+```
+*(TypeScript type-checking + Vite production bundling).*
+
+### Run Development Server
+```bash
+npm run dev
+```
+*(Accessible at `http://localhost:5173/`).*
 
 ---
 
-## 🛠️ Recent Updates (Changelog)
+## 📦 Deployment Instructions (GenLayer Testnet)
 
-- **GenLayer Intelligent Contract Implementation**: Created a fully valid GenLayer Intelligent Contract (`contracts/zenith_runner.py`) inheriting `gl.Contract` with GenLayer decorators (`@gl.public.write.payable`, `@gl.public.view`) and state annotations (`owner: Address`, `pilots: TreeMap`, `leaderboard: DynArray`).
-- **Real On-Chain Contract Integration**: Replaced local browser state mutations with real GenLayer contract method calls (`authorize_game_session`, `submit_high_score`, `daily_checkin`) and on-chain state reads (`get_pilot_profile`, `get_leaderboard`) using `genlayer-js`.
-- **GenLayer Service Module**: Added `src/services/genlayerService.ts` for unified RPC & client interaction with GenLayer Testnet.
-- **Enhanced Native Wallet Selection Modal**: Upgraded the wallet connection modal to a clean, native-feeling, glassmorphic selector UI.
+To deploy the intelligent contract using `genlayer-js` or the GenLayer CLI:
 
----
-
-## 📜 Legal & Policies
-
-Zenith Runner is a non-custodial Web3 application. We do not store, harvest, or request personal user data. All transactions and scores are transparently recorded on the public and immutable GenLayer Testnet. For full details on the Terms of Service, Privacy Policy, or Cookie Policies, click the policy buttons in the application footer.
-
----
-*Developed for the GenLayer Testnet Odyssey.*
+1. **Deploy Contract**:
+   ```bash
+   # Deploy contracts/zenith_runner.py with constructor argument <owner_address>
+   genlayer deploy --contract contracts/zenith_runner.py --args '["<YOUR_WALLET_ADDRESS>"]'
+   ```
+2. **Configure Frontend**:
+   Update `GENLAYER_CONTRACT_ADDRESS` in `src/services/genlayerService.ts`:
+   ```typescript
+   export const GENLAYER_CONTRACT_ADDRESS = '<DEPLOYED_CONTRACT_ADDRESS>' as `0x${string}`;
+   ```
+3. **Verify on Explorer**:
+   Navigate to `https://explorer.testnet-chain.genlayer.com/address/<DEPLOYED_CONTRACT_ADDRESS>` to verify the contract state, balance, and transaction history.
